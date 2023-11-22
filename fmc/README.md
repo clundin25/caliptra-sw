@@ -331,12 +331,12 @@ The following list of steps are to be performed by FMC on each boot when ROM jum
 |------|-----------|----------|-----------------------------|----------------------------|
 | 0 | | | 🔒LDevID Pub Key X | 🔒FMC SVN |
 | 1 | | | 🔒LDevID Pub Key Y | 🔒Manufacturer Public Key Index |
-| 2 | | | 🔒LDevID Cert Signature R |
-| 3 | | | 🔒LDevID Cert Signature S |
+| 2 | | |  |
+| 3 | | |  |
 | 4 | | | 🔒Alias FMC Pub Key X |
 | 5 | | | 🔒Alias FMC Pub Key Y |
-| 6 | Alias FMC CDI (48 bytes) | | 🔒Alias FMC Cert Signature R |
-| 7 | Alias FMC Private Key (48 bytes) | | 🔒Alias FMC Cert Signature S |
+| 6 | Alias FMC CDI (48 bytes) | |  |
+| 7 | Alias FMC Private Key (48 bytes) | | |
 | 8 |  | | 🔒FMC Digest |
 | 9 |  | | 🔒Owner PK Hash |
 
