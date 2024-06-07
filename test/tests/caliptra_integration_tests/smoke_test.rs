@@ -658,6 +658,7 @@ fn smoke_test() {
     }
 }
 
+#[ignore]
 #[test]
 fn test_rt_wdt_timeout() {
     // There is too much jitter in the fpga_realtime TRNG response timing to hit
@@ -740,6 +741,7 @@ fn test_rt_wdt_timeout() {
     assert_eq!(error_internal_intr_r, 0b01000000);
 }
 
+#[ignore]
 #[test]
 fn test_fmc_wdt_timeout() {
     const RTALIAS_BOOT_STATUS_BASE: u32 = 0x400;

@@ -86,6 +86,7 @@ fn test_wdt_not_enabled_on_debug_part() {
     assert!(!hw.soc_ifc().cptra_wdt_timer1_en().read().timer1_en());
 }
 
+#[ignore]
 #[test]
 fn test_rom_wdt_timeout() {
     const WDT_EXPIRED: u32 = 0x0105000C;

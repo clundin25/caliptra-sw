@@ -48,6 +48,7 @@ x509-parser.workspace = true
 
 [features]
 default = ["std"]
+arbitrary_max_handles = ["dpe/arbitrary_max_handles"]
 emu = ["caliptra_common/emu", "caliptra-drivers/emu"]
 itrng = ["caliptra-hw-model/itrng"]
 riscv = ["caliptra-cpu/riscv"]

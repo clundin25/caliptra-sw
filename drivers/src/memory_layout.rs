@@ -38,12 +38,12 @@ pub const PCR_LOG_ORG: u32 = 0x50004800;
 pub const MEASUREMENT_LOG_ORG: u32 = 0x50004C00;
 pub const FUSE_LOG_ORG: u32 = 0x50005000;
 pub const DPE_ORG: u32 = 0x50005400;
-pub const PCR_RESET_COUNTER_ORG: u32 = 0x50006400;
-pub const DATA_ORG: u32 = 0x50006800;
-pub const STACK_ORG: u32 = 0x5001A000;
+pub const PCR_RESET_COUNTER_ORG: u32 = DPE_ORG + DPE_SIZE;
+pub const DATA_ORG: u32 = PCR_RESET_COUNTER_ORG + PCR_RESET_COUNTER_SIZE;
+pub const STACK_ORG: u32 = DATA_ORG + DATA_SIZE;
 pub const ROM_STACK_ORG: u32 = 0x5001C000;
-pub const ESTACK_ORG: u32 = 0x5001F800;
-pub const NSTACK_ORG: u32 = 0x5001FC00;
+pub const ESTACK_ORG: u32 = STACK_ORG + STACK_SIZE;
+pub const NSTACK_ORG: u32 = ESTACK_ORG + ESTACK_SIZE;
 
 //
 // Memory Sizes In Bytes
@@ -63,7 +63,7 @@ pub const RTALIAS_TBS_SIZE: u32 = 1024;
 pub const PCR_LOG_SIZE: u32 = 1024;
 pub const MEASUREMENT_LOG_SIZE: u32 = 1024;
 pub const FUSE_LOG_SIZE: u32 = 1024;
-pub const DPE_SIZE: u32 = 4 * 1024;
+pub const DPE_SIZE: u32 = 5 * 1024;
 pub const PCR_RESET_COUNTER_SIZE: u32 = 1024;
 pub const DATA_SIZE: u32 = 78 * 1024;
 pub const STACK_SIZE: u32 = 22 * 1024;
