@@ -21,7 +21,7 @@ use caliptra_registers::soc_ifc::SocIfcReg;
 use core::cmp::min;
 use core::mem::size_of;
 use core::slice;
-use zerocopy::{AsBytes, LayoutVerified, Unalign};
+use zerocopy::{FromBytes, IntoBytes};
 
 #[derive(Copy, Clone, Default, Eq, PartialEq)]
 /// Malbox operational states
@@ -284,12 +284,14 @@ impl<'a> MailboxRecvPeek<'a> {
 
 /// Mailbox Fifo abstraction
 mod fifo {
+    use zerocopy::native_endian::U32;
+
     use super::*;
 
-    fn dequeue_words(mbox: &mut MboxCsr, buf: &mut [Unalign<u32>]) {
+    fn dequeue_words(mbox: &mut MboxCsr, buf: &mut [U32]) {
         let mbox = mbox.regs_mut();
         for word in buf.iter_mut() {
-            *word = Unalign::new(mbox.dataout().read());
+            word.set(mbox.dataout().read());
         }
     }
     pub fn dequeue(mbox: &mut MboxCsr, mut buf: &mut [u8]) {
@@ -299,20 +301,22 @@ mod fifo {
         }
 
         let len_words = buf.len() / size_of::<u32>();
-        let (mut buf_words, suffix) =
-            LayoutVerified::new_slice_unaligned_from_prefix(buf, len_words).unwrap();
-
-        dequeue_words(mbox, &mut buf_words);
-        if !suffix.is_empty() {
-            let last_word = mbox.regs().dataout().read();
-            let suffix_len = suffix.len();
-            suffix
-                .as_bytes_mut()
-                .copy_from_slice(&last_word.as_bytes()[..suffix_len]);
+        match <[U32]>::mut_from_prefix_with_elems(buf, len_words) {
+            Ok((buf_words, suffix)) => {
+                dequeue_words(mbox, buf_words);
+                if !suffix.is_empty() {
+                    let last_word = mbox.regs().dataout().read();
+                    let suffix_len = suffix.len();
+                    suffix
+                        .as_mut_bytes()
+                        .copy_from_slice(&last_word.as_bytes()[..suffix_len]);
+                }
+            }
+            _ => (),
         }
     }
 
-    fn enqueue_words(mbox: &mut MboxCsr, buf: &[Unalign<u32>]) {
+    fn enqueue_words(mbox: &mut MboxCsr, buf: &[U32]) {
         let mbox = mbox.regs_mut();
         for word in buf {
             mbox.datain().write(|_| word.get());
@@ -325,15 +329,17 @@ mod fifo {
         if mbox.regs().dlen().read() as usize != buf.len() {
             return Err(CaliptraError::DRIVER_MAILBOX_ENQUEUE_ERR);
         }
-
-        let (buf_words, suffix) =
-            LayoutVerified::new_slice_unaligned_from_prefix(buf, buf.len() / size_of::<u32>())
-                .unwrap();
-        enqueue_words(mbox, &buf_words);
-        if !suffix.is_empty() {
-            let mut last_word = 0_u32;
-            last_word.as_bytes_mut()[..suffix.len()].copy_from_slice(suffix);
-            enqueue_words(mbox, &[Unalign::new(last_word)]);
+        let count = buf.len() / size_of::<u32>();
+        match <[U32]>::ref_from_prefix_with_elems(buf, count) {
+            Ok((buf_words, suffix)) => {
+                enqueue_words(mbox, &buf_words);
+                if !suffix.is_empty() && suffix.len() <= size_of::<u32>() {
+                    let mut last_word = 0_u32;
+                    last_word.as_mut_bytes()[..suffix.len()].copy_from_slice(suffix);
+                    enqueue_words(mbox, &[U32::new(last_word)]);
+                }
+            }
+            _ => (),
         }
 
         Ok(())
