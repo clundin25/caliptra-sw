@@ -8,7 +8,7 @@ use caliptra_common::mailbox_api::{
 use caliptra_hw_model::{HwModel, ModelError, ShaAccMode};
 use caliptra_lms_types::{LmotsAlgorithmType, LmsAlgorithmType, LmsPublicKey, LmsSignature};
 use caliptra_runtime::RtBootStatus;
-use zerocopy::{AsBytes, FromBytes, LayoutVerified};
+use zerocopy::{FromBytes, IntoBytes, LayoutVerified};
 
 // Constants from fixed LMS param set
 const LMS_N: usize = 6;

@@ -4,7 +4,7 @@ use core::fmt::Debug;
 use core::marker::PhantomData;
 
 use caliptra_error::CaliptraError;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 use zeroize::Zeroize;
 
 use crate::memory_layout;
@@ -25,17 +25,17 @@ pub type RomAddr<T> = BoundedAddr<T, RomBounds>;
 
 #[repr(C)]
 #[derive(Zeroize)]
-pub struct BoundedAddr<T: AsBytes + FromBytes, B: MemBounds> {
+pub struct BoundedAddr<T: IntoBytes + FromBytes, B: MemBounds> {
     addr: u32,
     _phantom: PhantomData<(T, B)>,
 }
-unsafe impl<T: AsBytes + FromBytes, B: MemBounds> FromBytes for BoundedAddr<T, B> {
+unsafe impl<T: IntoBytes + FromBytes, B: MemBounds> FromBytes for BoundedAddr<T, B> {
     fn only_derive_is_allowed_to_implement_this_trait() {}
 }
-unsafe impl<T: AsBytes + FromBytes, B: MemBounds> AsBytes for BoundedAddr<T, B> {
+unsafe impl<T: IntoBytes + FromBytes, B: MemBounds> IntoBytes for BoundedAddr<T, B> {
     fn only_derive_is_allowed_to_implement_this_trait() {}
 }
-impl<T: AsBytes + FromBytes, B: MemBounds> BoundedAddr<T, B> {
+impl<T: IntoBytes + FromBytes, B: MemBounds> BoundedAddr<T, B> {
     pub fn new(addr: u32) -> Self {
         Self {
             addr,
@@ -63,17 +63,17 @@ impl<T: AsBytes + FromBytes, B: MemBounds> BoundedAddr<T, B> {
         Ok(())
     }
 }
-impl<T: AsBytes + FromBytes, B: MemBounds> Clone for BoundedAddr<T, B> {
+impl<T: IntoBytes + FromBytes, B: MemBounds> Clone for BoundedAddr<T, B> {
     fn clone(&self) -> Self {
         Self::new(self.addr)
     }
 }
-impl<T: AsBytes + FromBytes, B: MemBounds> Debug for BoundedAddr<T, B> {
+impl<T: IntoBytes + FromBytes, B: MemBounds> Debug for BoundedAddr<T, B> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("RomAddr").field("addr", &self.addr).finish()
     }
 }
-impl<T: AsBytes + FromBytes, B: MemBounds> From<&'static T> for BoundedAddr<T, B> {
+impl<T: IntoBytes + FromBytes, B: MemBounds> From<&'static T> for BoundedAddr<T, B> {
     fn from(value: &'static T) -> Self {
         Self::new(value as *const T as u32)
     }
@@ -84,7 +84,7 @@ mod tests {
     use super::*;
     use crate::memory_layout::{ROM_ORG, ROM_SIZE};
 
-    #[derive(AsBytes, FromBytes)]
+    #[derive(IntoBytes, FromBytes)]
     #[repr(C)]
     struct MyStruct {
         a: u32,

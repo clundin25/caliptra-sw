@@ -17,7 +17,7 @@ use caliptra_runtime::{
     MAX_HANDLES,
 };
 use caliptra_test_harness::{runtime_handlers, test_suite};
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 const OPCODE_READ_RT_FW_JOURNEY: u32 = 0x1000_0000;
 const OPCODE_READ_MBOX_PAUSER_HASH: u32 = 0x2000_0000;

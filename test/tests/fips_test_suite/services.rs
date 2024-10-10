@@ -12,7 +12,7 @@ use caliptra_image_types::ImageManifest;
 use common::*;
 use dpe::{commands::*, context::ContextHandle, response::Response, DPE_PROFILE};
 use openssl::sha::{sha384, sha512};
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 pub fn exec_cmd_sha_acc<T: HwModel>(hw: &mut T) {
     let msg: &[u8] = &[0u8; 4];

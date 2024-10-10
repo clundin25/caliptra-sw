@@ -21,7 +21,7 @@ use dpe::{
     validation::ValidationError,
     DpeInstance, U8Bool, DPE_PROFILE, MAX_HANDLES,
 };
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 use crate::common::run_rt_test;
 

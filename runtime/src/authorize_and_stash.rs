@@ -44,7 +44,7 @@ use dpe::{
     response::DpeErrorCode,
 };
 use memoffset::offset_of;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 pub const AUTHORIZE_IMAGE: u32 = 0xDEADC0DE;
 pub const DENY_IMAGE_AUTHORIZATION: u32 = 0x21523F21;

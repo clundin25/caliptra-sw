@@ -21,7 +21,7 @@ use caliptra_registers::soc_ifc::SocIfcReg;
 use core::cmp::min;
 use core::mem::size_of;
 use core::slice;
-use zerocopy::{AsBytes, LayoutVerified, Unalign};
+use zerocopy::{IntoBytes, LayoutVerified, Unalign};
 
 #[derive(Copy, Clone, Default, Eq, PartialEq)]
 /// Malbox operational states
@@ -307,7 +307,7 @@ mod fifo {
             let last_word = mbox.regs().dataout().read();
             let suffix_len = suffix.len();
             suffix
-                .as_bytes_mut()
+                .as_mut_bytes()
                 .copy_from_slice(&last_word.as_bytes()[..suffix_len]);
         }
     }
@@ -332,7 +332,7 @@ mod fifo {
         enqueue_words(mbox, &buf_words);
         if !suffix.is_empty() {
             let mut last_word = 0_u32;
-            last_word.as_bytes_mut()[..suffix.len()].copy_from_slice(suffix);
+            last_word.as_mut_bytes()[..suffix.len()].copy_from_slice(suffix);
             enqueue_words(mbox, &[Unalign::new(last_word)]);
         }
 

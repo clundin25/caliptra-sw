@@ -15,7 +15,7 @@ use dpe::{
 use x509_parser::{
     certificate::X509Certificate, extensions::GeneralName, oid_registry::asn1_rs::FromDer,
 };
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 use crate::common::{assert_error, run_rt_test, TEST_LABEL};
 

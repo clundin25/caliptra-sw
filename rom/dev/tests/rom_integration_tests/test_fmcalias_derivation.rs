@@ -25,7 +25,7 @@ use caliptra_image_gen::ImageGenerator;
 use caliptra_image_types::IMAGE_BYTE_SIZE;
 use caliptra_test::swap_word_bytes;
 use openssl::hash::{Hasher, MessageDigest};
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 use crate::helpers;
 

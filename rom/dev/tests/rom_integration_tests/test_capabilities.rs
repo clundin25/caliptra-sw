@@ -6,7 +6,7 @@ use caliptra_common::mailbox_api::{
     CapabilitiesResp, CommandId, MailboxReqHeader, MailboxRespHeader,
 };
 use caliptra_hw_model::{Fuses, HwModel};
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 use crate::helpers;
 

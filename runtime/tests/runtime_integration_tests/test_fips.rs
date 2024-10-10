@@ -8,7 +8,7 @@ use caliptra_common::mailbox_api::{
 };
 use caliptra_hw_model::HwModel;
 use caliptra_runtime::FipsVersionCmd;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 const HW_REV_ID: u32 = if cfg!(feature = "hw-1.0") { 0x1 } else { 0x11 };
 

@@ -25,7 +25,7 @@ use dpe::{
     commands::{CertifyKeyCmd, Command, CommandExecution},
     response::Response,
 };
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 use crate::{
     CptraDpeTypes, DpeCrypto, DpeEnv, DpePlatform, Drivers, PauserPrivileges, MAX_CERT_CHAIN_SIZE,

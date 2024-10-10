@@ -13,7 +13,7 @@ use caliptra_drivers::{
 use caliptra_hw_model::{BootParams, HwModel, InitParams};
 
 use caliptra_test::swap_word_bytes;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 use openssl::hash::{Hasher, MessageDigest};
 

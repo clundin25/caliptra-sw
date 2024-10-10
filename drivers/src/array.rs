@@ -14,7 +14,7 @@ Abstract:
 --*/
 
 use core::mem::MaybeUninit;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 use zeroize::Zeroize;
 
 macro_rules! static_assert {
@@ -42,7 +42,7 @@ impl<const W: usize, const B: usize> Default for Array4xN<W, B> {
 
 //// Ensure there is no padding in the struct
 static_assert!(core::mem::size_of::<Array4xN<1, 4>>() == 4);
-unsafe impl<const W: usize, const B: usize> AsBytes for Array4xN<W, B> {
+unsafe impl<const W: usize, const B: usize> IntoBytes for Array4xN<W, B> {
     fn only_derive_is_allowed_to_implement_this_trait() {}
 }
 

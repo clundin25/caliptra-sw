@@ -15,7 +15,7 @@ use caliptra_common::{
 use caliptra_hw_model::{BootParams, DefaultHwModel, HwModel, InitParams};
 use caliptra_image_types::RomInfo;
 use core::mem::size_of;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 const RT_READY_FOR_COMMANDS: u32 = 0x600;
 

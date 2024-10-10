@@ -20,7 +20,7 @@ use caliptra_hw_model_types::{
     ErrorInjectionMode, EtrngResponse, HexBytes, HexSlice, RandomEtrngResponses, RandomNibbles,
     DEFAULT_CPTRA_OBF_KEY,
 };
-use zerocopy::{AsBytes, FromBytes, LayoutVerified, Unalign};
+use zerocopy::{FromBytes, IntoBytes, LayoutVerified, Unalign};
 
 use caliptra_registers::mbox;
 use caliptra_registers::mbox::enums::{MboxFsmE, MboxStatusE};
@@ -820,7 +820,7 @@ pub trait HwModel: SocManager {
             return Err(ModelError::MailboxRespTypeTooSmall);
         }
         let (header_bytes, payload_bytes) = req
-            .as_bytes_mut()
+            .as_mut_bytes()
             .split_at_mut(mem::size_of::<MailboxReqHeader>());
 
         let mut header = MailboxReqHeader::read_from(header_bytes as &[u8]).unwrap();
@@ -841,7 +841,7 @@ pub trait HwModel: SocManager {
         }
 
         let mut response = R::Resp::new_zeroed();
-        response.as_bytes_mut()[..response_bytes.len()].copy_from_slice(&response_bytes);
+        response.as_mut_bytes()[..response_bytes.len()].copy_from_slice(&response_bytes);
 
         let response_header =
             MailboxRespHeader::read_from_prefix(response_bytes.as_slice()).unwrap();
@@ -1104,7 +1104,7 @@ mod tests {
     use caliptra_emu_bus::Bus;
     use caliptra_emu_types::RvSize;
     use caliptra_registers::{mbox::enums::MboxStatusE, soc_ifc};
-    use zerocopy::{AsBytes, FromBytes};
+    use zerocopy::{FromBytes, IntoBytes};
 
     use crate as caliptra_hw_model;
 
@@ -1523,7 +1523,7 @@ mod tests {
         const GET_RESPONSE_CMD: u32 = 0x3000_0001;
 
         #[repr(C)]
-        #[derive(AsBytes, FromBytes, Default)]
+        #[derive(IntoBytes, FromBytes, Default)]
         struct TestReq {
             hdr: MailboxReqHeader,
             data: [u8; 4],
@@ -1533,7 +1533,7 @@ mod tests {
             type Resp = TestResp;
         }
         #[repr(C)]
-        #[derive(AsBytes, Debug, FromBytes, PartialEq, Eq)]
+        #[derive(IntoBytes, Debug, FromBytes, PartialEq, Eq)]
         struct TestResp {
             hdr: MailboxRespHeader,
             data: [u8; 4],
@@ -1541,7 +1541,7 @@ mod tests {
         impl mailbox::Response for TestResp {}
 
         #[repr(C)]
-        #[derive(AsBytes, FromBytes, Default)]
+        #[derive(IntoBytes, FromBytes, Default)]
         struct TestReqNoData {
             hdr: MailboxReqHeader,
             data: [u8; 4],

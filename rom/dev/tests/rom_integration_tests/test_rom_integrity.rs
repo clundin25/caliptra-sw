@@ -8,7 +8,7 @@ use caliptra_builder::{
 use caliptra_error::CaliptraError;
 use caliptra_hw_model::{BootParams, HwModel, InitParams};
 use caliptra_image_types::RomInfo;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 fn find_rom_info_offset(rom: &[u8]) -> usize {
     for i in (0..rom.len()).step_by(64).rev() {

@@ -14,7 +14,7 @@ use dpe::{
         Response, ResponseHdr, SignResp,
     },
 };
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 pub const HOOK_CODE_MASK: u32 = 0x00FF0000;
 pub const HOOK_CODE_OFFSET: u32 = 16;
@@ -236,7 +236,7 @@ pub fn fips_test_init_to_rt(
     // HW model will complete FW upload cmd, nothing to wait for
 }
 
-pub fn mbx_send_and_check_resp_hdr<T: HwModel, U: FromBytes + AsBytes>(
+pub fn mbx_send_and_check_resp_hdr<T: HwModel, U: FromBytes + IntoBytes>(
     hw: &mut T,
     cmd: u32,
     req_payload: &[u8],
@@ -260,7 +260,7 @@ pub fn mbx_send_and_check_resp_hdr<T: HwModel, U: FromBytes + AsBytes>(
     // Handle variable-sized responses
     assert!(resp_bytes.len() <= std::mem::size_of::<U>());
     let mut typed_resp = U::new_zeroed();
-    typed_resp.as_bytes_mut()[..resp_bytes.len()].copy_from_slice(&resp_bytes);
+    typed_resp.as_mut_bytes()[..resp_bytes.len()].copy_from_slice(&resp_bytes);
     Ok(typed_resp)
 
     // TODO: Add option for fixed-length enforcement

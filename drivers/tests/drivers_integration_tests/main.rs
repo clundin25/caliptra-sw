@@ -23,7 +23,7 @@ use caliptra_test::{
 };
 use openssl::{hash::MessageDigest, pkey::PKey};
 use ureg::ResettableReg;
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 fn default_init_params() -> InitParams<'static> {
     InitParams {

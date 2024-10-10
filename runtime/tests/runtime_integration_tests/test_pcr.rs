@@ -16,7 +16,7 @@ use openssl::{
     hash::{Hasher, MessageDigest},
     x509::X509,
 };
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 #[test]
 fn test_pcr_quote() {

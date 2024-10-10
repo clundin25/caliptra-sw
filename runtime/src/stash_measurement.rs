@@ -25,7 +25,7 @@ use dpe::{
     dpe_instance::DpeEnv,
     response::DpeErrorCode,
 };
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 pub struct StashMeasurementCmd;
 impl StashMeasurementCmd {

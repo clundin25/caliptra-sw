@@ -144,9 +144,9 @@ chrono = "0.4"
 clap = { version = "3.2.14", default-features = false, features = ["std"] }
 cms = "0.2.2"
 convert_case = "0.6.0"
-dpe = { path = "dpe/dpe", default-features = false, features = ["dpe_profile_p384_sha384"] }
-crypto = { path = "dpe/crypto", default-features = false }
-platform = { path = "dpe/platform", default-features = false }
+dpe = { path = "/usr/local/google/home/clundin/code/caliptra-dpe/dpe", default-features = false, features = ["dpe_profile_p384_sha384"] }
+crypto = { path = "/usr/local/google/home/clundin/code/caliptra-dpe/crypto", default-features = false }
+platform = { path = "/usr/local/google/home/clundin/code/caliptra-dpe/platform", default-features = false }
 elf = "0.7.2"
 fips204 = "0.2.1"
 gdbstub = "0.6.3"
@@ -183,7 +183,7 @@ ureg-schema = { path = "ureg/lib/schema" }
 ureg-systemrdl = { path = "ureg/lib/systemrdl" }
 wycheproof = "0.5.1"
 x509-parser = "0.15.0"
-zerocopy = "0.6.6"
+zerocopy = { version = "0.8.3", features = ["derive"] }
 serial_test = "2.0.0"
 nix = "0.26.2"
 libc = "0.2"

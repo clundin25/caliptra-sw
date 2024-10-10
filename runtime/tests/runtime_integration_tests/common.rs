@@ -26,7 +26,7 @@ use openssl::{
     x509::{X509Builder, X509},
     x509::{X509Name, X509NameBuilder},
 };
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 pub const TEST_LABEL: [u8; 48] = [
     48, 47, 46, 45, 44, 43, 42, 41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25,
@@ -207,7 +207,7 @@ pub fn execute_dpe_cmd(
 
     assert!(resp.len() <= std::mem::size_of::<InvokeDpeResp>());
     let mut resp_hdr = InvokeDpeResp::default();
-    resp_hdr.as_bytes_mut()[..resp.len()].copy_from_slice(&resp);
+    resp_hdr.as_mut_bytes()[..resp.len()].copy_from_slice(&resp);
 
     assert!(caliptra_common::checksum::verify_checksum(
         resp_hdr.hdr.chksum,
@@ -252,7 +252,7 @@ pub fn get_fmc_alias_cert(model: &mut DefaultHwModel) -> GetFmcAliasCertResp {
         .unwrap();
     assert!(resp.len() <= std::mem::size_of::<GetFmcAliasCertResp>());
     let mut fmc_resp = GetFmcAliasCertResp::default();
-    fmc_resp.as_bytes_mut()[..resp.len()].copy_from_slice(&resp);
+    fmc_resp.as_mut_bytes()[..resp.len()].copy_from_slice(&resp);
     fmc_resp
 }
 
@@ -269,6 +269,6 @@ pub fn get_rt_alias_cert(model: &mut DefaultHwModel) -> GetRtAliasCertResp {
         .unwrap();
     assert!(resp.len() <= std::mem::size_of::<GetRtAliasCertResp>());
     let mut rt_resp = GetRtAliasCertResp::default();
-    rt_resp.as_bytes_mut()[..resp.len()].copy_from_slice(&resp);
+    rt_resp.as_mut_bytes()[..resp.len()].copy_from_slice(&resp);
     rt_resp
 }

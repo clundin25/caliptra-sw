@@ -7,7 +7,7 @@ use caliptra_common::mailbox_api::{
 };
 use caliptra_hw_model::{HwModel, ShaAccMode};
 use caliptra_runtime::RtBootStatus;
-use zerocopy::{AsBytes, FromBytes, LayoutVerified};
+use zerocopy::{FromBytes, IntoBytes, LayoutVerified};
 
 // This file includes some tests from Wycheproof to testing specific common
 // ECDSA problems.

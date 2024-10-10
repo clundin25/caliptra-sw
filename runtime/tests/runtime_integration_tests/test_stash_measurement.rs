@@ -11,7 +11,7 @@ use caliptra_common::mailbox_api::{
 use caliptra_hw_model::HwModel;
 use caliptra_runtime::RtBootStatus;
 use sha2::{Digest, Sha384};
-use zerocopy::{AsBytes, LayoutVerified};
+use zerocopy::{IntoBytes, LayoutVerified};
 
 use crate::common::run_rt_test;
 

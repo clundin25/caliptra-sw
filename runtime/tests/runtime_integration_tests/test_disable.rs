@@ -18,7 +18,7 @@ use openssl::{
     nid::Nid,
     x509::X509,
 };
-use zerocopy::{AsBytes, FromBytes};
+use zerocopy::{FromBytes, IntoBytes};
 
 use crate::common::{
     execute_dpe_cmd, get_rt_alias_cert, run_rt_test, DpeResult, TEST_DIGEST, TEST_LABEL,
