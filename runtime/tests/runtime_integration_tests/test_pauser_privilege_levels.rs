@@ -28,7 +28,7 @@ use dpe::{
     response::Response,
     DPE_PROFILE,
 };
-use zerocopy::AsBytes;
+use zerocopy::IntoBytes;
 
 use crate::common::{assert_error, execute_dpe_cmd, run_rt_test, DpeResult, TEST_LABEL};
 
@@ -50,7 +50,7 @@ fn test_pl0_derive_context_dpe_context_thresholds() {
     };
     let resp = execute_dpe_cmd(
         &mut model,
-        &mut Command::RotateCtx(rotate_ctx_cmd),
+        &mut Command::RotateCtx(&rotate_ctx_cmd),
         DpeResult::Success,
     );
     let Some(Response::RotateCtx(rotate_ctx_resp)) = resp else {
@@ -76,7 +76,7 @@ fn test_pl0_derive_context_dpe_context_thresholds() {
         if i == num_iterations - 1 {
             let resp = execute_dpe_cmd(
                 &mut model,
-                &mut Command::DeriveContext(derive_context_cmd),
+                &mut Command::DeriveContext(&derive_context_cmd),
                 DpeResult::MboxCmdFailure(
                     caliptra_drivers::CaliptraError::RUNTIME_PL0_USED_DPE_CONTEXT_THRESHOLD_REACHED,
                 ),
@@ -87,7 +87,7 @@ fn test_pl0_derive_context_dpe_context_thresholds() {
 
         let resp = execute_dpe_cmd(
             &mut model,
-            &mut Command::DeriveContext(derive_context_cmd),
+            &mut Command::DeriveContext(&derive_context_cmd),
             DpeResult::Success,
         );
         let Some(Response::DeriveContext(derive_context_resp)) = resp else {
@@ -114,7 +114,7 @@ fn test_pl1_derive_context_dpe_context_thresholds() {
     let init_ctx_cmd = InitCtxCmd::new_simulation();
     let resp = execute_dpe_cmd(
         &mut model,
-        &mut Command::InitCtx(init_ctx_cmd),
+        &mut Command::InitCtx(&init_ctx_cmd),
         DpeResult::Success,
     );
     let Some(Response::InitCtx(init_ctx_resp)) = resp else {
@@ -141,7 +141,7 @@ fn test_pl1_derive_context_dpe_context_thresholds() {
         if i == num_iterations - 1 {
             let resp = execute_dpe_cmd(
                 &mut model,
-                &mut Command::DeriveContext(derive_context_cmd),
+                &mut Command::DeriveContext(&derive_context_cmd),
                 DpeResult::MboxCmdFailure(
                     caliptra_drivers::CaliptraError::RUNTIME_PL1_USED_DPE_CONTEXT_THRESHOLD_REACHED,
                 ),
@@ -152,7 +152,7 @@ fn test_pl1_derive_context_dpe_context_thresholds() {
 
         let resp = execute_dpe_cmd(
             &mut model,
-            &mut Command::DeriveContext(derive_context_cmd),
+            &mut Command::DeriveContext(&derive_context_cmd),
             DpeResult::Success,
         );
         let Some(Response::DeriveContext(derive_context_resp)) = resp else {
@@ -178,7 +178,7 @@ fn test_pl0_init_ctx_dpe_context_thresholds() {
         if i == num_iterations - 1 {
             let resp = execute_dpe_cmd(
                 &mut model,
-                &mut Command::InitCtx(init_ctx_cmd),
+                &mut Command::InitCtx(&init_ctx_cmd),
                 DpeResult::MboxCmdFailure(
                     caliptra_drivers::CaliptraError::RUNTIME_PL0_USED_DPE_CONTEXT_THRESHOLD_REACHED,
                 ),
@@ -189,7 +189,7 @@ fn test_pl0_init_ctx_dpe_context_thresholds() {
 
         let resp = execute_dpe_cmd(
             &mut model,
-            &mut Command::InitCtx(init_ctx_cmd),
+            &mut Command::InitCtx(&init_ctx_cmd),
             DpeResult::Success,
         );
         let Some(Response::InitCtx(_)) = resp else {
@@ -219,7 +219,7 @@ fn test_pl1_init_ctx_dpe_context_thresholds() {
         if i == num_iterations - 1 {
             let resp = execute_dpe_cmd(
                 &mut model,
-                &mut Command::InitCtx(init_ctx_cmd),
+                &mut Command::InitCtx(&init_ctx_cmd),
                 DpeResult::MboxCmdFailure(
                     caliptra_drivers::CaliptraError::RUNTIME_PL1_USED_DPE_CONTEXT_THRESHOLD_REACHED,
                 ),
@@ -230,7 +230,7 @@ fn test_pl1_init_ctx_dpe_context_thresholds() {
 
         let resp = execute_dpe_cmd(
             &mut model,
-            &mut Command::InitCtx(init_ctx_cmd),
+            &mut Command::InitCtx(&init_ctx_cmd),
             DpeResult::Success,
         );
         let Some(Response::InitCtx(_)) = resp else {
@@ -312,7 +312,7 @@ fn test_certify_key_x509_cannot_be_called_from_pl1() {
     };
     let resp = execute_dpe_cmd(
         &mut model,
-        &mut Command::CertifyKey(certify_key_cmd),
+        &mut Command::CertifyKey(&certify_key_cmd),
         DpeResult::MboxCmdFailure(CaliptraError::RUNTIME_INCORRECT_PAUSER_PRIVILEGE_LEVEL),
     );
     assert!(resp.is_none());
@@ -364,7 +364,7 @@ fn test_derive_context_cannot_be_called_from_pl1_if_changes_locality_to_pl0() {
     let init_ctx_cmd = InitCtxCmd::new_simulation();
     let resp = execute_dpe_cmd(
         &mut model,
-        &mut Command::InitCtx(init_ctx_cmd),
+        &mut Command::InitCtx(&init_ctx_cmd),
         DpeResult::Success,
     );
     let Some(Response::InitCtx(init_ctx_resp)) = resp else {
@@ -380,7 +380,7 @@ fn test_derive_context_cannot_be_called_from_pl1_if_changes_locality_to_pl0() {
     };
     let resp = execute_dpe_cmd(
         &mut model,
-        &mut Command::DeriveContext(derive_context_cmd),
+        &mut Command::DeriveContext(&derive_context_cmd),
         DpeResult::MboxCmdFailure(
             caliptra_drivers::CaliptraError::RUNTIME_INCORRECT_PAUSER_PRIVILEGE_LEVEL,
         ),
@@ -560,7 +560,7 @@ fn test_pl0_unset_in_header() {
     };
     let resp = execute_dpe_cmd(
         &mut model,
-        &mut Command::CertifyKey(certify_key_cmd),
+        &mut Command::CertifyKey(&certify_key_cmd),
         DpeResult::MboxCmdFailure(CaliptraError::RUNTIME_INCORRECT_PAUSER_PRIVILEGE_LEVEL),
     );
     assert!(resp.is_none());
@@ -605,7 +605,7 @@ fn test_user_not_pl0() {
     };
     let resp = execute_dpe_cmd(
         &mut model,
-        &mut Command::CertifyKey(certify_key_cmd),
+        &mut Command::CertifyKey(&certify_key_cmd),
         DpeResult::MboxCmdFailure(CaliptraError::RUNTIME_INCORRECT_PAUSER_PRIVILEGE_LEVEL),
     );
     assert!(resp.is_none());

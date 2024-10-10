@@ -25,7 +25,7 @@ fn get_full_cert_chain(model: &mut DefaultHwModel, out: &mut [u8; 4096]) -> usiz
     };
     let resp = execute_dpe_cmd(
         model,
-        &mut Command::GetCertificateChain(get_cert_chain_cmd),
+        &mut Command::GetCertificateChain(&get_cert_chain_cmd),
         DpeResult::Success,
     );
     let Some(Response::GetCertificateChain(cert_chunk_1)) = resp else {
@@ -41,7 +41,7 @@ fn get_full_cert_chain(model: &mut DefaultHwModel, out: &mut [u8; 4096]) -> usiz
     };
     let resp = execute_dpe_cmd(
         model,
-        &mut Command::GetCertificateChain(get_cert_chain_cmd),
+        &mut Command::GetCertificateChain(&get_cert_chain_cmd),
         DpeResult::Success,
     );
     let Some(Response::GetCertificateChain(cert_chunk_2)) = resp else {
