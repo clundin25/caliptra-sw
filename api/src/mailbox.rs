@@ -3,7 +3,7 @@
 use bitflags::bitflags;
 use caliptra_error::{CaliptraError, CaliptraResult};
 use core::mem::size_of;
-use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref};
 
 use crate::CaliptraApiError;
 use caliptra_registers::mbox;
@@ -97,17 +97,15 @@ pub trait ResponseVarSize: IntoBytes + FromBytes + Immutable + KnownLayout {
     fn data(&self) -> CaliptraResult<&[u8]> {
         // Will panic if sizeof<Self>() is smaller than MailboxRespHeaderVarSize
         // or Self doesn't have compatible alignment with
-        // MailboxRespHeaderVarSize (should be impossible if MailboxRespHeaderVarSize is the first field)
-        let (hdr, data) =
-            LayoutVerified::<_, MailboxRespHeaderVarSize>::new_from_prefix(self.as_bytes())
-                .ok_or(CaliptraError::RUNTIME_MAILBOX_API_RESPONSE_DATA_LEN_TOO_LARGE)?;
+        // MailboxRespHeaderVarSize (should be impossible if MailboxRespHeaderVarSiz is the first field)                                                                 ..
+        let (hdr, data) = MailboxRespHeaderVarSize::read_from_prefix(self.as_bytes())
+            .map_err(|_| CaliptraError::RUNTIME_MAILBOX_API_RESPONSE_DATA_LEN_TOO_LARGE)?;
         data.get(..hdr.data_len as usize)
             .ok_or(CaliptraError::RUNTIME_MAILBOX_API_RESPONSE_DATA_LEN_TOO_LARGE)
     }
     fn partial_len(&self) -> CaliptraResult<usize> {
-        let (hdr, _) =
-            LayoutVerified::<_, MailboxRespHeaderVarSize>::new_from_prefix(self.as_bytes())
-                .ok_or(CaliptraError::RUNTIME_MAILBOX_API_RESPONSE_DATA_LEN_TOO_LARGE)?;
+        let (hdr, _) = MailboxRespHeaderVarSize::read_from_prefix(self.as_bytes())
+            .map_err(|_| CaliptraError::RUNTIME_MAILBOX_API_RESPONSE_DATA_LEN_TOO_LARGE)?;
         Ok(size_of::<MailboxRespHeaderVarSize>() + hdr.data_len as usize)
     }
     fn as_bytes_partial(&self) -> CaliptraResult<&[u8]> {
@@ -208,12 +206,10 @@ impl MailboxResp {
         if size_of::<MailboxRespHeader>() > mut_resp_bytes.len() {
             return Err(CaliptraError::RUNTIME_MAILBOX_API_RESPONSE_DATA_LEN_TOO_LARGE);
         }
-        // cast as header struct
-        let hdr: &mut MailboxRespHeader = LayoutVerified::<&mut [u8], MailboxRespHeader>::new(
+        let hdr: &mut MailboxRespHeader = MailboxRespHeader::mut_from_bytes(
             &mut mut_resp_bytes[..size_of::<MailboxRespHeader>()],
         )
-        .ok_or(CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?
-        .into_mut();
+        .map_err(|_| CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?;
 
         // Set the chksum field
         hdr.chksum = checksum;
@@ -337,12 +333,10 @@ impl MailboxReq {
             &self.as_bytes()?[size_of::<i32>()..],
         );
 
-        // cast as header struct
-        let hdr: &mut MailboxReqHeader = LayoutVerified::<&mut [u8], MailboxReqHeader>::new(
+        let hdr: &mut MailboxReqHeader = MailboxReqHeader::mut_from_bytes(
             &mut self.as_mut_bytes()?[..size_of::<MailboxReqHeader>()],
         )
-        .ok_or(CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?
-        .into_mut();
+        .map_err(|_| CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?;
 
         // Set the chksum field
         hdr.chksum = checksum;
@@ -1070,7 +1064,7 @@ pub fn mbox_read_fifo(
     }
 
     let len_words = buf.len() / size_of::<u32>();
-    let (mut buf_words, suffix) = LayoutVerified::new_slice_unaligned_from_prefix(buf, len_words)
+    let (mut buf_words, suffix) = Ref::new_slice_unaligned_from_prefix(buf, len_words)
         .ok_or(CaliptraApiError::ReadBuffTooSmall)?;
 
     dequeue_words(&mbox, &mut buf_words);

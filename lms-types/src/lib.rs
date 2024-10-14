@@ -5,8 +5,7 @@
 use core::mem::size_of;
 
 use zerocopy::{
-    BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, LittleEndian, 
-    U32,
+    BigEndian, FromBytes, Immutable, IntoBytes, KnownLayout, LittleEndian, Unaligned, U32,
 };
 use zeroize::Zeroize;
 
@@ -19,7 +18,19 @@ macro_rules! static_assert {
 }
 
 #[repr(transparent)]
-#[derive(IntoBytes, FromBytes, Copy, Clone, Debug, KnownLayout, Immutable, Default, PartialEq, Eq)]
+#[derive(
+    IntoBytes,
+    FromBytes,
+    Copy,
+    Clone,
+    Debug,
+    KnownLayout,
+    Immutable,
+    Unaligned,
+    Default,
+    PartialEq,
+    Eq,
+)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct LmsAlgorithmType(pub U32<BigEndian>);
 impl LmsAlgorithmType {
@@ -42,7 +53,19 @@ impl LmsAlgorithmType {
 }
 
 #[repr(transparent)]
-#[derive(IntoBytes, FromBytes, Debug, Immutable, KnownLayout, Default, PartialEq, Eq, Clone, Copy)]
+#[derive(
+    IntoBytes,
+    FromBytes,
+    Debug,
+    Immutable,
+    KnownLayout,
+    Unaligned,
+    Default,
+    PartialEq,
+    Eq,
+    Clone,
+    Copy,
+)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct LmotsAlgorithmType(pub U32<BigEndian>);
 
@@ -63,7 +86,7 @@ impl LmotsAlgorithmType {
     pub const LmotsSha256N24W8: Self = Self::new(8);
 }
 
-#[derive(Copy, Clone, Debug, FromBytes, Immutable, KnownLayout, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, IntoBytes, FromBytes, Immutable, KnownLayout, PartialEq, Eq)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[repr(C)]
 pub struct LmsPublicKey<const N: usize> {
@@ -92,7 +115,19 @@ static_assert!(
 );
 
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Copy, Clone, Debug, Immutable, KnownLayout, FromBytes, PartialEq, Eq, Zeroize)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    IntoBytes,
+    Immutable,
+    KnownLayout,
+    Unaligned,
+    FromBytes,
+    PartialEq,
+    Eq,
+    Zeroize,
+)]
 #[repr(C)]
 pub struct LmotsSignature<const N: usize, const P: usize> {
     #[zeroize(skip)]
@@ -122,7 +157,7 @@ static_assert!(
 );
 
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Copy, Clone, Debug, Immutable, KnownLayout, FromBytes, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, IntoBytes, Immutable, KnownLayout, FromBytes, PartialEq, Eq)]
 #[repr(C)]
 pub struct LmsSignature<const N: usize, const P: usize, const H: usize> {
     pub q: U32<BigEndian>,
@@ -152,7 +187,7 @@ static_assert!(
             + size_of::<[[U32<LittleEndian>; 1]; 1]>())
 );
 
-#[derive(Debug, Copy, Clone, Immutable, KnownLayout, FromBytes, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, IntoBytes, Immutable, KnownLayout, FromBytes, Eq, PartialEq)]
 #[repr(C)]
 pub struct LmsPrivateKey<const N: usize> {
     pub tree_type: LmsAlgorithmType,

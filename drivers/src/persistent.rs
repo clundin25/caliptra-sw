@@ -9,7 +9,8 @@ use caliptra_auth_man_types::AuthManifestImageMetadataCollection;
 use caliptra_image_types::ImageManifest;
 #[cfg(feature = "runtime")]
 use dpe::{DpeInstance, U8Bool, MAX_HANDLES};
-use zerocopy::{FromBytes, IntoBytes};
+use zerocopy::native_endian::U32;
+use zerocopy::{TryFromBytes, Immutable, IntoBytes, KnownLayout};
 use zeroize::Zeroize;
 
 use crate::{
@@ -44,7 +45,7 @@ pub type StashMeasurementArray = [MeasurementLogEntry; MEASUREMENT_MAX_COUNT];
 pub type AuthManifestImageMetadataList =
     [AuthManifestImageMetadata; AUTH_MANIFEST_IMAGE_METADATA_LIST_MAX_COUNT];
 
-#[derive(FromBytes, IntoBytes, Zeroize)]
+#[derive(TryFromBytes, IntoBytes, Immutable, KnownLayout, Zeroize)]
 #[repr(C)]
 pub struct PersistentData {
     pub manifest1: ImageManifest,
@@ -75,7 +76,7 @@ pub struct PersistentData {
     #[cfg(feature = "runtime")]
     pub dpe: DpeInstance,
     #[cfg(feature = "runtime")]
-    pub context_tags: [u32; MAX_HANDLES],
+    pub context_tags: [U32; MAX_HANDLES],
     #[cfg(feature = "runtime")]
     pub context_has_tag: [U8Bool; MAX_HANDLES],
     #[cfg(feature = "runtime")]
@@ -177,7 +178,7 @@ impl PersistentDataAccessor {
 }
 
 #[inline(always)]
-unsafe fn ref_from_addr<'a, T: FromBytes>(addr: u32) -> &'a T {
+unsafe fn ref_from_addr<'a, T: TryFromBytes>(addr: u32) -> &'a T {
     // LTO should be able to optimize out the assertions to maintain panic_is_missing
 
     // dereferencing zero is undefined behavior
@@ -188,7 +189,7 @@ unsafe fn ref_from_addr<'a, T: FromBytes>(addr: u32) -> &'a T {
 }
 
 #[inline(always)]
-unsafe fn ref_mut_from_addr<'a, T: FromBytes>(addr: u32) -> &'a mut T {
+unsafe fn ref_mut_from_addr<'a, T: TryFromBytes>(addr: u32) -> &'a mut T {
     // LTO should be able to optimize out the assertions to maintain panic_is_missing
 
     // dereferencing zero is undefined behavior
