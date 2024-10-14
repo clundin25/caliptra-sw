@@ -76,8 +76,8 @@ impl LmsVerifyCmd {
         const LMS_ALGORITHM_TYPE: LmsAlgorithmType = LmsAlgorithmType::new(12);
         const LMOTS_ALGORITHM_TYPE: LmotsAlgorithmType = LmotsAlgorithmType::new(7);
 
-        let cmd =
-            LmsVerifyReq::ref_from_bytes(cmd_args).map_err(|_| CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?;
+        let cmd = LmsVerifyReq::ref_from_bytes(cmd_args)
+            .map_err(|_| CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?;
         // Get the digest from the SHA accelerator
         let msg_digest_be = drivers.sha_acc.regs().digest().truncate::<12>().read();
         // Flip the endianness since LMS treats this as raw message bytes

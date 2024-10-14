@@ -74,8 +74,8 @@ pub struct ExtendPcrCmd;
 impl ExtendPcrCmd {
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
     pub(crate) fn execute(drivers: &mut Drivers, cmd_args: &[u8]) -> CaliptraResult<MailboxResp> {
-        let cmd =
-            ExtendPcrReq::ref_from_bytes(cmd_args).map_err(|_| CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?;
+        let cmd = ExtendPcrReq::ref_from_bytes(cmd_args)
+            .map_err(|_| CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?;
 
         let idx =
             u8::try_from(cmd.pcr_idx).map_err(|_| CaliptraError::RUNTIME_MAILBOX_INVALID_PARAMS)?;

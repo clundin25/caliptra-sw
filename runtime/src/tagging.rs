@@ -32,8 +32,8 @@ pub struct TagTciCmd;
 impl TagTciCmd {
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
     pub(crate) fn execute(drivers: &mut Drivers, cmd_args: &[u8]) -> CaliptraResult<MailboxResp> {
-        let cmd =
-            TagTciReq::ref_from_bytes(cmd_args).map_err(|_| CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?;
+        let cmd = TagTciReq::ref_from_bytes(cmd_args)
+            .map_err(|_| CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?;
         let pdata_mut = drivers.persistent_data.get_mut();
         let mut dpe = &mut pdata_mut.dpe;
         let mut context_has_tag = &mut pdata_mut.context_has_tag;

@@ -993,8 +993,7 @@ pub trait HwModel: SocManager {
 
         // Unwrap cannot fail, count * sizeof(u32) is always smaller than data.len()
         let (prefix_words, suffix_bytes) =
-            Ref::<_, [Unalign<u32>]>::from_prefix_with_elems(data, data.len() / 4)
-                .unwrap();
+            Ref::<_, [Unalign<u32>]>::from_prefix_with_elems(data, data.len() / 4).unwrap();
 
         for word in Ref::into_ref(prefix_words) {
             self.soc_sha512_acc()
