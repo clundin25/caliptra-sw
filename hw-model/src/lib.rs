@@ -1101,7 +1101,7 @@ mod tests {
     use caliptra_emu_bus::Bus;
     use caliptra_emu_types::RvSize;
     use caliptra_registers::{mbox::enums::MboxStatusE, soc_ifc};
-    use zerocopy::{FromBytes, IntoBytes};
+    use zerocopy::{FromBytes, IntoBytes, Immutable, KnownLayout};
 
     use crate as caliptra_hw_model;
 
@@ -1520,7 +1520,7 @@ mod tests {
         const GET_RESPONSE_CMD: u32 = 0x3000_0001;
 
         #[repr(C)]
-        #[derive(IntoBytes, FromBytes, Default)]
+        #[derive(IntoBytes, FromBytes, Immutable, KnownLayout, Default)]
         struct TestReq {
             hdr: MailboxReqHeader,
             data: [u8; 4],
@@ -1538,7 +1538,7 @@ mod tests {
         impl mailbox::Response for TestResp {}
 
         #[repr(C)]
-        #[derive(IntoBytes, FromBytes, Default)]
+        #[derive(IntoBytes, FromBytes, Immutable, KnownLayout, Default)]
         struct TestReqNoData {
             hdr: MailboxReqHeader,
             data: [u8; 4],
