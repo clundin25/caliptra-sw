@@ -768,8 +768,8 @@ fn execute_lms_cmd<T: HwModel>(
     pub_key_bytes: &[u8],
     signature_bytes: &[u8],
 ) -> Result<(), ModelError> {
-    let pub_key = <LmsPublicKey<LMS_N>>::read_from(pub_key_bytes).unwrap();
-    let signature = <LmsSignature<LMS_N, LMS_P, LMS_H>>::read_from(signature_bytes).unwrap();
+    let pub_key = <LmsPublicKey<LMS_N>>::read_from_bytes(pub_key_bytes).unwrap();
+    let signature = <LmsSignature<LMS_N, LMS_P, LMS_H>>::read_from_bytes(signature_bytes).unwrap();
 
     let mut cmd = MailboxReq::LmsVerify(LmsVerifyReq {
         hdr: MailboxReqHeader { chksum: 0 },
@@ -861,7 +861,7 @@ fn test_lms_verify_invalid_sig_lms_type() {
 
     // Select an invalid LMS type
     let mut signature =
-        <LmsSignature<LMS_N, LMS_P, LMS_H>>::read_from(&MSG_1_KEY_1_SIG_1[..]).unwrap();
+        <LmsSignature<LMS_N, LMS_P, LMS_H>>::read_from_bytes(&MSG_1_KEY_1_SIG_1[..]).unwrap();
     signature.tree_type = LmsAlgorithmType::new(10);
 
     let resp =
@@ -883,7 +883,7 @@ fn test_lms_verify_invalid_key_lms_type() {
     });
 
     // Select an invalid LMS type
-    let mut pub_key = <LmsPublicKey<LMS_N>>::read_from(&MSG_1_PUB_KEY_1[..]).unwrap();
+    let mut pub_key = <LmsPublicKey<LMS_N>>::read_from_bytes(&MSG_1_PUB_KEY_1[..]).unwrap();
     pub_key.tree_type = LmsAlgorithmType::new(10);
 
     let resp =
@@ -905,7 +905,7 @@ fn test_lms_verify_invalid_lmots_type() {
     });
 
     // Select an invalid otstype
-    let mut pub_key = <LmsPublicKey<LMS_N>>::read_from(&MSG_1_PUB_KEY_1[..]).unwrap();
+    let mut pub_key = <LmsPublicKey<LMS_N>>::read_from_bytes(&MSG_1_PUB_KEY_1[..]).unwrap();
     pub_key.otstype = LmotsAlgorithmType::new(6);
 
     let resp =

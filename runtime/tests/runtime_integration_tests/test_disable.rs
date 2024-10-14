@@ -53,7 +53,7 @@ fn test_disable_attestation_cmd() {
         )
         .unwrap()
         .unwrap();
-    let resp_hdr = MailboxRespHeader::read_from(resp.as_bytes()).unwrap();
+    let resp_hdr = MailboxRespHeader::read_from_bytes(resp.as_bytes()).unwrap();
     assert_eq!(
         resp_hdr.fips_status,
         MailboxRespHeader::FIPS_STATUS_APPROVED
@@ -108,7 +108,7 @@ fn test_attestation_disabled_flag_after_update_reset() {
         )
         .unwrap()
         .unwrap();
-    let resp_hdr = MailboxRespHeader::read_from(resp.as_bytes()).unwrap();
+    let resp_hdr = MailboxRespHeader::read_from_bytes(resp.as_bytes()).unwrap();
     assert_eq!(
         resp_hdr.fips_status,
         MailboxRespHeader::FIPS_STATUS_APPROVED
@@ -135,7 +135,7 @@ fn test_attestation_disabled_flag_after_update_reset() {
         .mailbox_execute(u32::from(CommandId::FW_INFO), payload.as_bytes())
         .unwrap()
         .unwrap();
-    let info = FwInfoResp::read_from(resp.as_slice()).unwrap();
+    let info = FwInfoResp::read_from_bytes(resp.as_slice()).unwrap();
     assert_eq!(info.attestation_disabled, 1);
 
     // test that attestation is really disabled by checking that

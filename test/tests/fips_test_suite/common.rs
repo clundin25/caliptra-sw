@@ -244,9 +244,10 @@ pub fn mbx_send_and_check_resp_hdr<T: HwModel, U: FromBytes + IntoBytes>(
     let resp_bytes = hw.mailbox_execute(cmd, req_payload)?.unwrap();
 
     // Check values against expected.
-    let resp_hdr =
-        MailboxRespHeader::read_from(&resp_bytes[..core::mem::size_of::<MailboxRespHeader>()])
-            .unwrap();
+    let resp_hdr = MailboxRespHeader::read_from_bytes(
+        &resp_bytes[..core::mem::size_of::<MailboxRespHeader>()],
+    )
+    .unwrap();
     assert!(caliptra_common::checksum::verify_checksum(
         resp_hdr.chksum,
         0x0,
@@ -264,7 +265,7 @@ pub fn mbx_send_and_check_resp_hdr<T: HwModel, U: FromBytes + IntoBytes>(
     Ok(typed_resp)
 
     // TODO: Add option for fixed-length enforcement
-    //Ok(U::read_from(resp_bytes.as_bytes()).unwrap())
+    //Ok(U::read_from_bytes(resp_bytes.as_bytes()).unwrap())
 }
 
 fn get_cmd_id(dpe_cmd: &mut Command) -> u32 {
@@ -295,19 +296,27 @@ pub fn as_bytes(dpe_cmd: &mut Command) -> &[u8] {
 pub fn parse_dpe_response(dpe_cmd: &mut Command, resp_bytes: &[u8]) -> Response {
     match dpe_cmd {
         Command::CertifyKey(_) => {
-            Response::CertifyKey(CertifyKeyResp::read_from(resp_bytes).unwrap())
+            Response::CertifyKey(CertifyKeyResp::read_from_bytes(resp_bytes).unwrap())
         }
         Command::DeriveContext(_) => {
-            Response::DeriveContext(DeriveContextResp::read_from(resp_bytes).unwrap())
+            Response::DeriveContext(DeriveContextResp::read_from_bytes(resp_bytes).unwrap())
         }
-        Command::GetCertificateChain(_) => {
-            Response::GetCertificateChain(GetCertificateChainResp::read_from(resp_bytes).unwrap())
+        Command::GetCertificateChain(_) => Response::GetCertificateChain(
+            GetCertificateChainResp::read_from_bytes(resp_bytes).unwrap(),
+        ),
+        Command::DestroyCtx(_) => {
+            Response::DestroyCtx(ResponseHdr::read_from_bytes(resp_bytes).unwrap())
         }
-        Command::DestroyCtx(_) => Response::DestroyCtx(ResponseHdr::read_from(resp_bytes).unwrap()),
-        Command::GetProfile => Response::GetProfile(GetProfileResp::read_from(resp_bytes).unwrap()),
-        Command::InitCtx(_) => Response::InitCtx(NewHandleResp::read_from(resp_bytes).unwrap()),
-        Command::RotateCtx(_) => Response::RotateCtx(NewHandleResp::read_from(resp_bytes).unwrap()),
-        Command::Sign(_) => Response::Sign(SignResp::read_from(resp_bytes).unwrap()),
+        Command::GetProfile => {
+            Response::GetProfile(GetProfileResp::read_from_bytes(resp_bytes).unwrap())
+        }
+        Command::InitCtx(_) => {
+            Response::InitCtx(NewHandleResp::read_from_bytes(resp_bytes).unwrap())
+        }
+        Command::RotateCtx(_) => {
+            Response::RotateCtx(NewHandleResp::read_from_bytes(resp_bytes).unwrap())
+        }
+        Command::Sign(_) => Response::Sign(SignResp::read_from_bytes(resp_bytes).unwrap()),
     }
 }
 

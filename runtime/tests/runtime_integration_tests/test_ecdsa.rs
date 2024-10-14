@@ -117,7 +117,7 @@ fn ecdsa_cmd_run_wycheproof() {
                     }
                     Ok(Some(resp)) => {
                         // Verify the checksum and FIPS status
-                        let resp_hdr = MailboxRespHeader::read_from(resp.as_slice()).unwrap();
+                        let resp_hdr = MailboxRespHeader::read_from_bytes(resp.as_slice()).unwrap();
                         assert_eq!(
                             resp_hdr.fips_status,
                             MailboxRespHeader::FIPS_STATUS_APPROVED

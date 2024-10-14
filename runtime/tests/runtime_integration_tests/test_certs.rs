@@ -185,7 +185,7 @@ fn test_ldev_cert() {
         .mailbox_execute(u32::from(CommandId::GET_IDEV_INFO), payload.as_bytes())
         .unwrap()
         .unwrap();
-    let idev_resp = GetIdevInfoResp::read_from(resp.as_slice()).unwrap();
+    let idev_resp = GetIdevInfoResp::read_from_bytes(resp.as_slice()).unwrap();
 
     // Check the LDevID is signed by IDevID
     let group = EcGroup::from_curve_name(Nid::SECP384R1).unwrap();
@@ -446,7 +446,7 @@ pub fn test_all_measurement_apis() {
         flags: DeriveContextFlags::MAKE_DEFAULT
             | DeriveContextFlags::INPUT_ALLOW_CA
             | DeriveContextFlags::INPUT_ALLOW_X509,
-        tci_type: u32::read_from(&tci_type[..]).unwrap(),
+        tci_type: u32::read_from_bytes(&tci_type[..]).unwrap(),
         target_locality: 0,
     };
     let resp = execute_dpe_cmd(

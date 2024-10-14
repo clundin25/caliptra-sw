@@ -181,7 +181,7 @@ fn test_dpe_validation_deformed_structure() {
         .mailbox_execute(u32::from(CommandId::FW_INFO), payload.as_bytes())
         .unwrap()
         .unwrap();
-    let info = FwInfoResp::read_from(resp.as_slice()).unwrap();
+    let info = FwInfoResp::read_from_bytes(resp.as_slice()).unwrap();
     assert_eq!(info.attestation_disabled, 1);
 }
 
@@ -225,7 +225,7 @@ fn test_dpe_validation_illegal_state() {
         .mailbox_execute(u32::from(CommandId::FW_INFO), payload.as_bytes())
         .unwrap()
         .unwrap();
-    let info = FwInfoResp::read_from(resp.as_slice()).unwrap();
+    let info = FwInfoResp::read_from_bytes(resp.as_slice()).unwrap();
     assert_eq!(info.attestation_disabled, 1);
 }
 
@@ -275,7 +275,7 @@ fn test_dpe_validation_used_context_threshold_exceeded() {
         .mailbox_execute(u32::from(CommandId::FW_INFO), payload.as_bytes())
         .unwrap()
         .unwrap();
-    let info = FwInfoResp::read_from(resp.as_slice()).unwrap();
+    let info = FwInfoResp::read_from_bytes(resp.as_slice()).unwrap();
     assert_eq!(info.attestation_disabled, 1);
 }
 
