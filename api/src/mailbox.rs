@@ -67,7 +67,7 @@ impl From<CommandId> for u32 {
 
 /// A trait implemented by request types. Describes the associated command ID
 /// and response type.
-pub trait Request: IntoBytes + FromBytes {
+pub trait Request: IntoBytes + FromBytes + Immutable + KnownLayout {
     const ID: CommandId;
     type Resp: Response;
 }

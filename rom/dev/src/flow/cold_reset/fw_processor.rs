@@ -37,7 +37,7 @@ use caliptra_image_verify::{ImageVerificationInfo, ImageVerificationLogInfo, Ima
 use caliptra_kat::KatsEnv;
 use caliptra_x509::{NotAfter, NotBefore};
 use core::mem::ManuallyDrop;
-use zerocopy::{IntoBytes, LayoutVerified};
+use zerocopy::{FromBytes, IntoBytes};
 use zeroize::Zeroize;
 
 #[derive(Debug, Default, Zeroize)]
@@ -601,11 +601,9 @@ impl FirmwareProcessor {
         txn.copy_request(data)?;
 
         // Extract header out from the rest of the request
-        let req_hdr: &MailboxReqHeader = LayoutVerified::<&[u8], MailboxReqHeader>::new(
-            &data[..core::mem::size_of::<MailboxReqHeader>()],
-        )
-        .ok_or(CaliptraError::FW_PROC_MAILBOX_PROCESS_FAILURE)?
-        .into_ref();
+        let req_hdr: &MailboxReqHeader =
+            MailboxReqHeader::ref_from_bytes(&data[..core::mem::size_of::<MailboxReqHeader>()])
+                .map_err(|_| CaliptraError::FW_PROC_MAILBOX_PROCESS_FAILURE)?;
 
         // Verify checksum
         if !caliptra_common::checksum::verify_checksum(

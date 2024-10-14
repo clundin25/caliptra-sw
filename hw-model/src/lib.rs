@@ -20,7 +20,7 @@ use caliptra_hw_model_types::{
     ErrorInjectionMode, EtrngResponse, HexBytes, HexSlice, RandomEtrngResponses, RandomNibbles,
     DEFAULT_CPTRA_OBF_KEY,
 };
-use zerocopy::{FromBytes, IntoBytes, LayoutVerified, Unalign};
+use zerocopy::{FromBytes, FromZeros, IntoBytes, Ref, Unalign};
 
 use caliptra_registers::mbox;
 use caliptra_registers::mbox::enums::{MboxFsmE, MboxStatusE};
@@ -843,7 +843,7 @@ pub trait HwModel: SocManager {
         let mut response = R::Resp::new_zeroed();
         response.as_mut_bytes()[..response_bytes.len()].copy_from_slice(&response_bytes);
 
-        let response_header =
+        let (response_header, _remaining_bytes) =
             MailboxRespHeader::read_from_prefix(response_bytes.as_slice()).unwrap();
         let actual_checksum = calc_checksum(0, &response_bytes[4..]);
         if actual_checksum != response_header.chksum {
@@ -993,11 +993,8 @@ pub trait HwModel: SocManager {
 
         // Unwrap cannot fail, count * sizeof(u32) is always smaller than data.len()
         let (prefix_words, suffix_bytes) =
-            LayoutVerified::<_, [Unalign<u32>]>::new_slice_unaligned_from_prefix(
-                data,
-                data.len() / 4,
-            )
-            .unwrap();
+            Ref::<_, [Unalign<u32>]>::new_slice_unaligned_from_prefix(data, data.len() / 4)
+                .unwrap();
 
         for word in prefix_words.into_slice() {
             self.soc_sha512_acc()

@@ -172,7 +172,7 @@ pub struct AuthManifestImageMetadataCollection {
 
 /// Caliptra Image Authorization Manifest
 #[repr(C)]
-#[derive(IntoBytes, FromBytes, Clone, Copy, Debug, Zeroize, Default)]
+#[derive(IntoBytes, FromBytes, Immutable, KnownLayout, Clone, Copy, Debug, Zeroize, Default)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct AuthorizationManifest {
     pub preamble: AuthManifestPreamble,

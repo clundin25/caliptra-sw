@@ -9,8 +9,7 @@ use caliptra_auth_man_types::AuthManifestImageMetadataCollection;
 use caliptra_image_types::ImageManifest;
 #[cfg(feature = "runtime")]
 use dpe::{DpeInstance, U8Bool, MAX_HANDLES};
-use zerocopy::native_endian::U32;
-use zerocopy::{TryFromBytes, Immutable, IntoBytes, KnownLayout};
+use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
 use zeroize::Zeroize;
 
 use crate::{
@@ -45,7 +44,7 @@ pub type StashMeasurementArray = [MeasurementLogEntry; MEASUREMENT_MAX_COUNT];
 pub type AuthManifestImageMetadataList =
     [AuthManifestImageMetadata; AUTH_MANIFEST_IMAGE_METADATA_LIST_MAX_COUNT];
 
-#[derive(TryFromBytes, IntoBytes, Immutable, KnownLayout, Zeroize)]
+#[derive(TryFromBytes, IntoBytes, KnownLayout, Zeroize)]
 #[repr(C)]
 pub struct PersistentData {
     pub manifest1: ImageManifest,
@@ -76,7 +75,7 @@ pub struct PersistentData {
     #[cfg(feature = "runtime")]
     pub dpe: DpeInstance,
     #[cfg(feature = "runtime")]
-    pub context_tags: [U32; MAX_HANDLES],
+    pub context_tags: [u32; MAX_HANDLES],
     #[cfg(feature = "runtime")]
     pub context_has_tag: [U8Bool; MAX_HANDLES],
     #[cfg(feature = "runtime")]
