@@ -10,7 +10,6 @@ use bitfield::{bitfield_bitrange, bitfield_fields};
 use caliptra_error::CaliptraError;
 use caliptra_image_types::RomInfo;
 use core::mem::size_of;
-use zerocopy::native_endian::U32;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, TryFromBytes};
 use zeroize::Zeroize;
 

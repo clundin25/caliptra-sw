@@ -299,7 +299,7 @@ mod fifo {
         }
 
         let len_words = buf.len() / size_of::<u32>();
-        let (mut buf_words, suffix) = Ref::new_slice_unaligned_from_prefix(buf, len_words).unwrap();
+        let (mut buf_words, suffix) = Ref::from_prefix_with_elems(buf, len_words).unwrap();
 
         dequeue_words(mbox, &mut buf_words);
         if !suffix.is_empty() {
@@ -326,7 +326,7 @@ mod fifo {
         }
 
         let (buf_words, suffix) =
-            Ref::new_slice_unaligned_from_prefix(buf, buf.len() / size_of::<u32>()).unwrap();
+            Ref::from_prefix_with_elems(buf, buf.len() / size_of::<u32>()).unwrap();
         enqueue_words(mbox, &buf_words);
         if !suffix.is_empty() {
             let mut last_word = 0_u32;

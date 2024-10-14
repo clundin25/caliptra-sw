@@ -1064,8 +1064,8 @@ pub fn mbox_read_fifo(
     }
 
     let len_words = buf.len() / size_of::<u32>();
-    let (mut buf_words, suffix) = Ref::new_slice_unaligned_from_prefix(buf, len_words)
-        .ok_or(CaliptraApiError::ReadBuffTooSmall)?;
+    let (mut buf_words, suffix) = Ref::from_prefix_with_elems(buf, len_words)
+        .map_err(|_| CaliptraApiError::ReadBuffTooSmall)?;
 
     dequeue_words(&mbox, &mut buf_words);
     if !suffix.is_empty() {

@@ -32,8 +32,8 @@ impl StashMeasurementCmd {
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
     #[inline(never)]
     pub(crate) fn execute(drivers: &mut Drivers, cmd_args: &[u8]) -> CaliptraResult<MailboxResp> {
-        let cmd = StashMeasurementReq::read_from(cmd_args)
-            .ok_or(CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?;
+        let cmd = StashMeasurementReq::ref_from_bytes(cmd_args)
+            .map_err(|_| CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?;
         let dpe_result = {
             match drivers.caller_privilege_level() {
                 // Only PL0 can call STASH_MEASUREMENT

@@ -438,8 +438,8 @@ impl SetAuthManifestCmd {
         let preamble_size = size_of::<AuthManifestPreamble>();
         let auth_manifest_preamble = {
             let err = CaliptraError::RUNTIME_AUTH_MANIFEST_PREAMBLE_SIZE_LT_MIN;
-            AuthManifestPreamble::read_from(manifest_buf.get(..preamble_size).ok_or(err)?)
-                .ok_or(err)?
+            let bytes = manifest_buf.get(..preamble_size).ok_or(err)?;
+            AuthManifestPreamble::ref_from_bytes(bytes).map_err(|_| err)?
         };
 
         // Check if the preamble has the required marker.

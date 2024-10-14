@@ -67,7 +67,7 @@ pub fn lms_pub_key_from_pem(path: &PathBuf) -> anyhow::Result<ImageLmsPublicKey>
     let key_bytes = std::fs::read(path)
         .with_context(|| format!("Failed to read public key PEM file {}", path.display()))?;
 
-    ImageLmsPublicKey::read_from(&key_bytes[..]).ok_or(anyhow!("Error parsing LMS public key"))
+    ImageLmsPublicKey::read_from_bytes(&key_bytes[..]).map_err(|_| anyhow!("Error parsing LMS public key"))
 }
 
 /// Read LMS SHA192 private Key from PEM file
@@ -75,7 +75,7 @@ pub fn lms_priv_key_from_pem(path: &PathBuf) -> anyhow::Result<ImageLmsPrivKey> 
     let key_bytes = std::fs::read(path)
         .with_context(|| format!("Failed to read private key PEM file {}", path.display()))?;
 
-    ImageLmsPrivKey::read_from(&key_bytes[..]).ok_or(anyhow!("Error parsing LMS priv key"))
+    ImageLmsPrivKey::read_from_bytes(&key_bytes[..]).map_err(|_| anyhow!("Error parsing LMS priv key"))
 }
 
 /// Convert the slice to hardware format

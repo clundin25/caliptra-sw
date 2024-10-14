@@ -29,8 +29,8 @@ pub struct EcdsaVerifyCmd;
 impl EcdsaVerifyCmd {
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
     pub(crate) fn execute(drivers: &mut Drivers, cmd_args: &[u8]) -> CaliptraResult<MailboxResp> {
-        let cmd = EcdsaVerifyReq::read_from(cmd_args)
-            .ok_or(CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?;
+        let cmd = EcdsaVerifyReq::ref_from_bytes(cmd_args)
+            .map_err(|_| CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?;
         // Won't panic, full_digest is always larger than digest
         let full_digest = drivers.sha_acc.regs().digest().read();
         let mut digest = Array4x12::default();
@@ -77,7 +77,7 @@ impl LmsVerifyCmd {
         const LMOTS_ALGORITHM_TYPE: LmotsAlgorithmType = LmotsAlgorithmType::new(7);
 
         let cmd =
-            LmsVerifyReq::read_from(cmd_args).ok_or(CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?;
+            LmsVerifyReq::ref_from_bytes(cmd_args).map_err(|_| CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?;
         // Get the digest from the SHA accelerator
         let msg_digest_be = drivers.sha_acc.regs().digest().truncate::<12>().read();
         // Flip the endianness since LMS treats this as raw message bytes
@@ -88,21 +88,21 @@ impl LmsVerifyCmd {
 
         let lms_pub_key: LmsPublicKey<LMS_N> = LmsPublicKey {
             id: cmd.pub_key_id,
-            digest: <[U32<LittleEndian>; LMS_N]>::read_from(&cmd.pub_key_digest[..])
-                .ok_or(CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?,
+            digest: <[U32<LittleEndian>; LMS_N]>::read_from_bytes(&cmd.pub_key_digest[..])
+                .map_err(|_| CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?,
             tree_type: LmsAlgorithmType::new(cmd.pub_key_tree_type),
             otstype: LmotsAlgorithmType::new(cmd.pub_key_ots_type),
         };
 
         let lms_sig: LmsSignature<LMS_N, LMS_P, LMS_H> = LmsSignature {
             q: <U32<BigEndian>>::from(cmd.signature_q),
-            ots: <LmotsSignature<LMS_N, LMS_P>>::read_from(&cmd.signature_ots[..])
-                .ok_or(CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?,
+            ots: <LmotsSignature<LMS_N, LMS_P>>::read_from_bytes(&cmd.signature_ots[..])
+                .map_err(|_| CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?,
             tree_type: LmsAlgorithmType::new(cmd.signature_tree_type),
-            tree_path: <[[U32<LittleEndian>; LMS_N]; LMS_H]>::read_from(
+            tree_path: <[[U32<LittleEndian>; LMS_N]; LMS_H]>::read_from_bytes(
                 &cmd.signature_tree_path[..],
             )
-            .ok_or(CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?,
+            .map_err(|_| CaliptraError::RUNTIME_INSUFFICIENT_MEMORY)?,
         };
 
         // Check that fixed params are correct

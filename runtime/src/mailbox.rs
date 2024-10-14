@@ -133,7 +133,7 @@ impl Mailbox {
 
     /// Copies word-aligned `buf` to the mailbox
     pub fn copy_bytes_to_mbox(&mut self, buf: &[u8]) -> CaliptraResult<()> {
-        let (buf_words, suffix) = Ref::new_slice_unaligned_from_prefix(buf, buf.len() / 4).unwrap();
+        let (buf_words, suffix) = Ref::from_prefix_with_elems(buf, buf.len() / 4).unwrap();
         self.copy_words_to_mbox(&buf_words);
         if !suffix.is_empty() {
             let mut last_word = 0_u32;

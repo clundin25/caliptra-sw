@@ -9,7 +9,7 @@ use caliptra_auth_man_types::AuthManifestImageMetadataCollection;
 use caliptra_image_types::ImageManifest;
 #[cfg(feature = "runtime")]
 use dpe::{DpeInstance, U8Bool, MAX_HANDLES};
-use zerocopy::{Immutable, IntoBytes, KnownLayout, TryFromBytes};
+use zerocopy::{IntoBytes, KnownLayout, TryFromBytes};
 use zeroize::Zeroize;
 
 use crate::{
