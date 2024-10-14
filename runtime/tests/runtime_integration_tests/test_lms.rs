@@ -8,7 +8,7 @@ use caliptra_common::mailbox_api::{
 use caliptra_hw_model::{HwModel, ModelError, ShaAccMode};
 use caliptra_lms_types::{LmotsAlgorithmType, LmsAlgorithmType, LmsPublicKey, LmsSignature};
 use caliptra_runtime::RtBootStatus;
-use zerocopy::{FromBytes, IntoBytes, LayoutVerified};
+use zerocopy::{FromBytes, IntoBytes};
 
 // Constants from fixed LMS param set
 const LMS_N: usize = 6;
@@ -795,10 +795,7 @@ fn execute_lms_cmd<T: HwModel>(
         .mailbox_execute(u32::from(CommandId::LMS_VERIFY), cmd.as_bytes().unwrap())?
         .expect("We should have received a response");
 
-    let resp_hdr: &MailboxRespHeader =
-        LayoutVerified::<&[u8], MailboxRespHeader>::new(resp.as_bytes())
-            .unwrap()
-            .into_ref();
+    let resp_hdr: &MailboxRespHeader = MailboxRespHeader::ref_from_bytes(resp.as_bytes()).unwrap();
 
     assert_eq!(
         resp_hdr.fips_status,

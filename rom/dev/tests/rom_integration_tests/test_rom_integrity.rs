@@ -55,7 +55,7 @@ fn test_rom_integrity_failure() {
 #[test]
 fn test_read_rom_info_from_fmc() {
     let rom = caliptra_builder::build_firmware_rom(firmware::rom_from_env()).unwrap();
-    let rom_info_from_image =
+    let (rom_info_from_image, _) =
         RomInfo::read_from_prefix(&rom[find_rom_info_offset(&rom)..]).unwrap();
     let image_bundle = caliptra_builder::build_and_sign_image(
         &TEST_FMC_WITH_UART,

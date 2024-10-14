@@ -1101,7 +1101,7 @@ mod tests {
     use caliptra_emu_bus::Bus;
     use caliptra_emu_types::RvSize;
     use caliptra_registers::{mbox::enums::MboxStatusE, soc_ifc};
-    use zerocopy::{FromBytes, IntoBytes, Immutable, KnownLayout};
+    use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
     use crate as caliptra_hw_model;
 
