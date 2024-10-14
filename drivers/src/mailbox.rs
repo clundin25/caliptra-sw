@@ -21,7 +21,7 @@ use caliptra_registers::soc_ifc::SocIfcReg;
 use core::cmp::min;
 use core::mem::size_of;
 use core::slice;
-use zerocopy::{IntoBytes, LayoutVerified, Unalign};
+use zerocopy::{IntoBytes, Ref, Unalign};
 
 #[derive(Copy, Clone, Default, Eq, PartialEq)]
 /// Malbox operational states
@@ -300,7 +300,7 @@ mod fifo {
 
         let len_words = buf.len() / size_of::<u32>();
         let (mut buf_words, suffix) =
-            LayoutVerified::new_slice_unaligned_from_prefix(buf, len_words).unwrap();
+            Ref::new_slice_unaligned_from_prefix(buf, len_words).unwrap();
 
         dequeue_words(mbox, &mut buf_words);
         if !suffix.is_empty() {
@@ -327,7 +327,7 @@ mod fifo {
         }
 
         let (buf_words, suffix) =
-            LayoutVerified::new_slice_unaligned_from_prefix(buf, buf.len() / size_of::<u32>())
+            Ref::new_slice_unaligned_from_prefix(buf, buf.len() / size_of::<u32>())
                 .unwrap();
         enqueue_words(mbox, &buf_words);
         if !suffix.is_empty() {
