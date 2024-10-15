@@ -28,7 +28,7 @@ fn test_version() {
         .unwrap()
         .unwrap();
 
-    let version_resp = FipsVersionResp::read_from_bytes(response.as_bytes()).unwrap();
+    let version_resp = FipsVersionResp::ref_from_bytes(response.as_bytes()).unwrap();
 
     // Verify response checksum
     assert!(caliptra_common::checksum::verify_checksum(

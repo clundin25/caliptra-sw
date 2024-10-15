@@ -98,7 +98,7 @@ fn check_pcr_log_entry(
     pcr_data: &[u8],
 ) {
     let offset = pcr_entry_index * PCR_ENTRY_SIZE;
-    let (entry, _) = PcrLogEntry::read_from_prefix(pcr_entry_arr[offset..].as_bytes()).unwrap();
+    let (entry, _) = PcrLogEntry::ref_from_prefix(pcr_entry_arr[offset..].as_bytes()).unwrap();
 
     assert_eq!(entry.id, entry_id as u16);
     assert_eq!(entry.pcr_ids, pcr_ids);
@@ -112,7 +112,7 @@ fn check_measurement_log_entry(
 ) {
     let offset = measurement_entry_index * MEASUREMENT_ENTRY_SIZE;
     let (entry, _) =
-        MeasurementLogEntry::read_from_prefix(measurement_entry_arr[offset..].as_bytes()).unwrap();
+        MeasurementLogEntry::ref_from_prefix(measurement_entry_arr[offset..].as_bytes()).unwrap();
 
     assert_eq!(entry.pcr_entry.id, PcrLogEntryId::StashMeasurement as u16);
     assert_eq!(entry.pcr_entry.pcr_ids, PCR31_EXTENDED_ID);
@@ -424,7 +424,7 @@ fn hash_pcr_log_entries(initial_pcr: &[u8; 48], pcr_entry_arr: &[u8], pcr_id: Pc
             break;
         }
 
-        let (entry, _) = PcrLogEntry::read_from_prefix(pcr_entry_arr[offset..].as_bytes()).unwrap();
+        let (entry, _) = PcrLogEntry::ref_from_prefix(pcr_entry_arr[offset..].as_bytes()).unwrap();
         offset += PCR_ENTRY_SIZE;
 
         if (entry.pcr_ids & (1 << pcr_id as u8)) == 0 {
@@ -449,7 +449,7 @@ fn hash_measurement_log_entries(measurement_entry_arr: &[u8]) -> [u8; 48] {
         }
 
         let (entry, _) =
-            MeasurementLogEntry::read_from_prefix(measurement_entry_arr[offset..].as_bytes())
+            MeasurementLogEntry::ref_from_prefix(measurement_entry_arr[offset..].as_bytes())
                 .unwrap();
         offset += MEASUREMENT_ENTRY_SIZE;
 
@@ -620,7 +620,7 @@ fn test_fuse_log() {
 
     // Check entry for VendorPubKeyIndex.
     let (fuse_log_entry, _) =
-        FuseLogEntry::read_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
+        FuseLogEntry::ref_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
 
     assert_eq!(
         fuse_log_entry.entry_id,
@@ -632,7 +632,7 @@ fn test_fuse_log() {
     // Validate that the ID is VendorPubKeyRevocation
     fuse_log_entry_offset += core::mem::size_of::<FuseLogEntry>();
     let (fuse_log_entry, _) =
-        FuseLogEntry::read_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
+        FuseLogEntry::ref_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
     assert_eq!(
         fuse_log_entry.entry_id,
         FuseLogEntryId::VendorEccPubKeyRevocation as u32
@@ -642,7 +642,7 @@ fn test_fuse_log() {
     // Validate the ManifestFmcSvn
     fuse_log_entry_offset += core::mem::size_of::<FuseLogEntry>();
     let (fuse_log_entry, _) =
-        FuseLogEntry::read_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
+        FuseLogEntry::ref_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
     assert_eq!(
         fuse_log_entry.entry_id,
         FuseLogEntryId::ManifestFmcSvn as u32
@@ -652,7 +652,7 @@ fn test_fuse_log() {
     // Validate the ManifestReserved0
     fuse_log_entry_offset += core::mem::size_of::<FuseLogEntry>();
     let (fuse_log_entry, _) =
-        FuseLogEntry::read_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
+        FuseLogEntry::ref_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
     assert_eq!(
         fuse_log_entry.entry_id,
         FuseLogEntryId::ManifestReserved0 as u32
@@ -662,14 +662,14 @@ fn test_fuse_log() {
     // Validate the FuseFmcSvn
     fuse_log_entry_offset += core::mem::size_of::<FuseLogEntry>();
     let (fuse_log_entry, _) =
-        FuseLogEntry::read_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
+        FuseLogEntry::ref_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
     assert_eq!(fuse_log_entry.entry_id, FuseLogEntryId::FuseFmcSvn as u32);
     assert_eq!(fuse_log_entry.log_data[0], FMC_SVN);
 
     // Validate the ManifestRtSvn
     fuse_log_entry_offset += core::mem::size_of::<FuseLogEntry>();
     let (fuse_log_entry, _) =
-        FuseLogEntry::read_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
+        FuseLogEntry::ref_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
     assert_eq!(
         fuse_log_entry.entry_id,
         FuseLogEntryId::ManifestRtSvn as u32
@@ -679,7 +679,7 @@ fn test_fuse_log() {
     // Validate the ManifestReserved1
     fuse_log_entry_offset += core::mem::size_of::<FuseLogEntry>();
     let (fuse_log_entry, _) =
-        FuseLogEntry::read_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
+        FuseLogEntry::ref_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
     assert_eq!(
         fuse_log_entry.entry_id,
         FuseLogEntryId::ManifestReserved1 as u32
@@ -689,14 +689,14 @@ fn test_fuse_log() {
     // Validate the FuseRtSvn
     fuse_log_entry_offset += core::mem::size_of::<FuseLogEntry>();
     let (fuse_log_entry, _) =
-        FuseLogEntry::read_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
+        FuseLogEntry::ref_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
     assert_eq!(fuse_log_entry.entry_id, FuseLogEntryId::FuseRtSvn as u32);
     assert_eq!(fuse_log_entry.log_data[0], FMC_SVN);
 
     // Validate the VendorLmsPubKeyIndex
     fuse_log_entry_offset += core::mem::size_of::<FuseLogEntry>();
     let (fuse_log_entry, _) =
-        FuseLogEntry::read_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
+        FuseLogEntry::ref_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
     assert_eq!(
         fuse_log_entry.entry_id,
         FuseLogEntryId::VendorLmsPubKeyIndex as u32
@@ -706,7 +706,7 @@ fn test_fuse_log() {
     // Validate that the ID is VendorPubKeyRevocation
     fuse_log_entry_offset += core::mem::size_of::<FuseLogEntry>();
     let (fuse_log_entry, _) =
-        FuseLogEntry::read_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
+        FuseLogEntry::ref_from_prefix(fuse_entry_arr[fuse_log_entry_offset..].as_bytes()).unwrap();
     assert_eq!(
         fuse_log_entry.entry_id,
         FuseLogEntryId::VendorLmsPubKeyRevocation as u32
@@ -788,15 +788,15 @@ fn test_check_no_lms_info_in_datavault_on_lms_unavailable() {
 
     // Check LmsVendorPubKeyIndex datavault value.
     let (coldresetentry4_id, _) =
-        u32::read_from_prefix(coldresetentry4_array[coldresetentry4_offset..].as_bytes()).unwrap();
+        u32::ref_from_prefix(coldresetentry4_array[coldresetentry4_offset..].as_bytes()).unwrap();
     assert_eq!(
-        coldresetentry4_id,
+        *coldresetentry4_id,
         ColdResetEntry4::LmsVendorPubKeyIndex as u32
     );
     coldresetentry4_offset += core::mem::size_of::<u32>();
     let (coldresetentry4_value, _) =
-        u32::read_from_prefix(coldresetentry4_array[coldresetentry4_offset..].as_bytes()).unwrap();
-    assert_eq!(coldresetentry4_value, u32::MAX);
+        u32::ref_from_prefix(coldresetentry4_array[coldresetentry4_offset..].as_bytes()).unwrap();
+    assert_eq!(*coldresetentry4_value, u32::MAX);
 }
 
 #[test]
@@ -836,15 +836,15 @@ fn test_check_rom_cold_boot_status_reg() {
 
     // Check RomColdBootStatus datavault value.
     let (coldresetentry4_id, _) =
-        u32::read_from_prefix(coldresetentry4_array[coldresetentry4_offset..].as_bytes()).unwrap();
+        u32::ref_from_prefix(coldresetentry4_array[coldresetentry4_offset..].as_bytes()).unwrap();
     assert_eq!(
-        coldresetentry4_id,
+        *coldresetentry4_id,
         ColdResetEntry4::RomColdBootStatus as u32
     );
     coldresetentry4_offset += core::mem::size_of::<u32>();
     let (coldresetentry4_value, _) =
-        u32::read_from_prefix(coldresetentry4_array[coldresetentry4_offset..].as_bytes()).unwrap();
-    assert_eq!(coldresetentry4_value, u32::from(ColdResetComplete));
+        u32::ref_from_prefix(coldresetentry4_array[coldresetentry4_offset..].as_bytes()).unwrap();
+    assert_eq!(*coldresetentry4_value, u32::from(ColdResetComplete));
 }
 
 #[test]

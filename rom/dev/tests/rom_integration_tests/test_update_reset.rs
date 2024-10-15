@@ -457,15 +457,15 @@ fn test_check_rom_update_reset_status_reg() {
 
     // Check RomUpdateResetStatus datavault value.
     let (warmresetentry4_id, _) =
-        u32::read_from_prefix(warmresetentry4_array[warmresetentry4_offset..].as_bytes()).unwrap();
+        u32::ref_from_prefix(warmresetentry4_array[warmresetentry4_offset..].as_bytes()).unwrap();
     assert_eq!(
-        warmresetentry4_id,
+        *warmresetentry4_id,
         WarmResetEntry4::RomUpdateResetStatus as u32
     );
     warmresetentry4_offset += core::mem::size_of::<u32>();
     let (warmresetentry4_value, _) =
-        u32::read_from_prefix(warmresetentry4_array[warmresetentry4_offset..].as_bytes()).unwrap();
-    assert_eq!(warmresetentry4_value, u32::from(UpdateResetComplete));
+        u32::ref_from_prefix(warmresetentry4_array[warmresetentry4_offset..].as_bytes()).unwrap();
+    assert_eq!(*warmresetentry4_value, u32::from(UpdateResetComplete));
 }
 
 #[test]

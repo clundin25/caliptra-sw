@@ -24,7 +24,7 @@ fn test_capabilities() {
         .unwrap()
         .unwrap();
 
-    let capabilities_resp = CapabilitiesResp::read_from_bytes(response.as_bytes()).unwrap();
+    let capabilities_resp = CapabilitiesResp::ref_from_bytes(response.as_bytes()).unwrap();
 
     // Verify response checksum
     assert!(caliptra_common::checksum::verify_checksum(
