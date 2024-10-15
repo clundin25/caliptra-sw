@@ -98,13 +98,13 @@ pub trait ResponseVarSize: IntoBytes + FromBytes + Immutable + KnownLayout {
         // Will panic if sizeof<Self>() is smaller than MailboxRespHeaderVarSize
         // or Self doesn't have compatible alignment with
         // MailboxRespHeaderVarSize (should be impossible if MailboxRespHeaderVarSiz is the first field)                                                                 ..
-        let (hdr, data) = MailboxRespHeaderVarSize::read_from_prefix(self.as_bytes())
+        let (hdr, data) = MailboxRespHeaderVarSize::ref_from_prefix(self.as_bytes())
             .map_err(|_| CaliptraError::RUNTIME_MAILBOX_API_RESPONSE_DATA_LEN_TOO_LARGE)?;
         data.get(..hdr.data_len as usize)
             .ok_or(CaliptraError::RUNTIME_MAILBOX_API_RESPONSE_DATA_LEN_TOO_LARGE)
     }
     fn partial_len(&self) -> CaliptraResult<usize> {
-        let (hdr, _) = MailboxRespHeaderVarSize::read_from_prefix(self.as_bytes())
+        let (hdr, _) = MailboxRespHeaderVarSize::ref_from_prefix(self.as_bytes())
             .map_err(|_| CaliptraError::RUNTIME_MAILBOX_API_RESPONSE_DATA_LEN_TOO_LARGE)?;
         Ok(size_of::<MailboxRespHeaderVarSize>() + hdr.data_len as usize)
     }

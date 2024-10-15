@@ -823,9 +823,8 @@ pub trait HwModel: SocManager {
             .as_mut_bytes()
             .split_at_mut(mem::size_of::<MailboxReqHeader>());
 
-        let mut header = MailboxReqHeader::read_from_bytes(header_bytes).unwrap();
+        let mut header = MailboxReqHeader::mut_from_bytes(header_bytes).unwrap();
         header.chksum = api::calc_checksum(R::ID.into(), payload_bytes);
-        header_bytes.copy_from_slice(header.as_bytes());
 
         let Some(response_bytes) = self.mailbox_execute(R::ID.into(), req.as_bytes())? else {
             return Err(ModelError::MailboxNoResponseData);
@@ -844,7 +843,7 @@ pub trait HwModel: SocManager {
         response.as_mut_bytes()[..response_bytes.len()].copy_from_slice(&response_bytes);
 
         let (response_header, _remaining_bytes) =
-            MailboxRespHeader::read_from_prefix(response_bytes.as_slice()).unwrap();
+            MailboxRespHeader::ref_from_prefix(response_bytes.as_slice()).unwrap();
         let actual_checksum = calc_checksum(0, &response_bytes[4..]);
         if actual_checksum != response_header.chksum {
             return Err(ModelError::MailboxRespInvalidChecksum {
