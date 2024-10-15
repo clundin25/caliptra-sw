@@ -29,9 +29,10 @@ pub struct BoundedAddr<T: IntoBytes + FromBytes, B: MemBounds> {
     addr: u32,
     _phantom: PhantomData<(T, B)>,
 }
-// Unaligned is not implemented for u32, so `BoundedAddr` cannot currently derive `IntoBytes`.
+// Unaligned is not implemented for `u32`, so `BoundedAddr` cannot currently derive `IntoBytes`.
 // Potentially `u32` can be swapped with `U32` from the zerocopy crate, but this type does not
 // implement Zeroize.
+// We could potentially wrap `U32` with a new type to workaround the orphan rule in the future.
 unsafe impl<T: IntoBytes + FromBytes, B: MemBounds> IntoBytes for BoundedAddr<T, B> {
     fn only_derive_is_allowed_to_implement_this_trait() {}
 }
