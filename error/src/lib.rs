@@ -497,6 +497,8 @@ impl CaliptraError {
     pub const FW_PROC_MAILBOX_STASH_MEASUREMENT_MAX_LIMIT: CaliptraError =
         CaliptraError::new_const(0x01020008);
     pub const FW_PROC_MAILBOX_RESERVED_PAUSER: CaliptraError = CaliptraError::new_const(0x01020009);
+    pub const FW_PROC_MAILBOX_UNPROVISIONED_CSR: CaliptraError =
+        CaliptraError::new_const(0x0102000A);
 
     /// FMC Alias Layer : Certificate Verification Failure.
     pub const FMC_ALIAS_CERT_VERIFY: CaliptraError = CaliptraError::new_const(0x01030001);
