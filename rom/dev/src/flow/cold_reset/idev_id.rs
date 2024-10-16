@@ -319,3 +319,14 @@ impl InitDevIdLayer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use caliptra_drivers::memory_layout::IDEVID_CSR_SIZE;
+
+    #[test]
+    fn verify_csr_fits_in_dccm() {
+        assert!(MAX_CSR_SIZE <= IDEVID_CSR_SIZE as usize);
+    }
+}
