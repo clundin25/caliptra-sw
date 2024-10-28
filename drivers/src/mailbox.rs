@@ -306,10 +306,9 @@ mod fifo {
                 dequeue_words(mbox, buf_words);
                 if !suffix.is_empty() {
                     let last_word = mbox.regs().dataout().read();
-                    let suffix_len = suffix.len();
-                    suffix
-                        .as_mut_bytes()
-                        .copy_from_slice(&last_word.as_bytes()[..suffix_len]);
+                    if let Ok(suffix_buf) = U32::mut_from_bytes(suffix) {
+                        *suffix_buf = last_word.into();
+                    }
                 }
             }
             _ => (),
@@ -333,10 +332,10 @@ mod fifo {
         match <[U32]>::ref_from_prefix_with_elems(buf, count) {
             Ok((buf_words, suffix)) => {
                 enqueue_words(mbox, &buf_words);
-                if !suffix.is_empty() && suffix.len() <= size_of::<u32>() {
-                    let mut last_word = 0_u32;
-                    last_word.as_mut_bytes()[..suffix.len()].copy_from_slice(suffix);
-                    enqueue_words(mbox, &[U32::new(last_word)]);
+                if !suffix.is_empty() {
+                    if let Ok(last_word) = U32::ref_from_bytes(suffix) {
+                        enqueue_words(mbox, &[*last_word]);
+                    }
                 }
             }
             _ => (),
