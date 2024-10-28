@@ -294,7 +294,7 @@ mod fifo {
             word.set(mbox.dataout().read());
         }
     }
-    pub fn dequeue(mbox: &mut MboxCsr, mut buf: &mut [u8]) {
+    pub fn dequeue(mbox: &mut MboxCsr, mut buf: &mut [u8]) -> CaliptraResult<()> {
         let dlen_bytes = mbox.regs().dlen().read() as usize;
         if dlen_bytes < buf.len() {
             buf = &mut buf[..dlen_bytes];
@@ -310,8 +310,9 @@ mod fifo {
                         *suffix_buf = last_word.into();
                     }
                 }
+                Ok(())
             }
-            _ => (),
+            _ => Err(CaliptraError::DRIVER_MAILBOX_ENQUEUE_ERR),
         }
     }
 
@@ -337,11 +338,10 @@ mod fifo {
                         enqueue_words(mbox, &[*last_word]);
                     }
                 }
+                Ok(())
             }
-            _ => (),
+            _ => Err(CaliptraError::DRIVER_MAILBOX_ENQUEUE_ERR),
         }
-
-        Ok(())
     }
 }
 
@@ -421,7 +421,7 @@ impl MailboxRecvTxn<'_> {
         if self.state != MailboxOpState::Execute {
             return Err(CaliptraError::DRIVER_MAILBOX_INVALID_STATE);
         }
-        fifo::dequeue(self.mbox, data);
+        fifo::dequeue(self.mbox, data)?;
         if mailbox_uncorrectable_ecc() {
             return Err(CaliptraError::DRIVER_MAILBOX_UNCORRECTABLE_ECC);
         }
