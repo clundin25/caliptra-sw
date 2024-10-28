@@ -21,7 +21,7 @@ use caliptra_registers::soc_ifc::SocIfcReg;
 use core::cmp::min;
 use core::mem::size_of;
 use core::slice;
-use zerocopy::{FromBytes, IntoBytes};
+use zerocopy::FromBytes;
 
 #[derive(Copy, Clone, Default, Eq, PartialEq)]
 /// Malbox operational states
