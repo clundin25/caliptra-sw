@@ -170,7 +170,7 @@ impl MailboxSendTxn<'_> {
     /// Transitions mailbox to RdyForData state and copies data to mailbox.
     /// * 'cmd' - Command to Be Sent
     /// * 'data' - Data Bufer
-    pub fn copy_request(&mut self, cmd: u32, data: &[u8]) -> CaliptraResult<()> {
+    pub fn copy_request(&mut self, cmd: u32, data: &mut [u8]) -> CaliptraResult<()> {
         if self.state != MailboxOpState::RdyForCmd {
             return Err(CaliptraError::DRIVER_MAILBOX_INVALID_STATE);
         }
@@ -208,7 +208,7 @@ impl MailboxSendTxn<'_> {
     /// Send Data to SOC
     /// * 'cmd' - Command to Be Sent
     /// * 'data' - Data Bufer
-    pub fn send_request(&mut self, cmd: u32, data: &[u8]) -> CaliptraResult<()> {
+    pub fn send_request(&mut self, cmd: u32, data: &mut [u8]) -> CaliptraResult<()> {
         self.copy_request(cmd, data)?;
         self.execute_request()?;
         Ok(())
@@ -292,6 +292,7 @@ mod fifo {
             *word = mbox.dataout().read();
         }
     }
+
     pub fn dequeue(mbox: &mut MboxCsr, mut buf: &mut [u8]) -> CaliptraResult<()> {
         let dlen_bytes = mbox.regs().dlen().read() as usize;
         if dlen_bytes < buf.len() {
@@ -305,8 +306,7 @@ mod fifo {
         if !suffix.is_empty() && suffix.len() <= size_of::<u32>() {
             let last_word = mbox.regs().dataout().read();
             let suffix_len = suffix.len();
-            suffix
-                .copy_from_slice(&last_word.as_bytes()[..suffix_len]);
+            suffix.copy_from_slice(&last_word.as_bytes()[..suffix_len]);
         }
         Ok(())
     }
@@ -320,14 +320,16 @@ mod fifo {
 
     /// Writes buf.len() bytes to the mailbox datain reg as dwords
     #[inline(never)]
-    pub fn enqueue(mbox: &mut MboxCsr, buf: &[u8]) -> CaliptraResult<()> {
+    pub fn enqueue(mbox: &mut MboxCsr, buf: &mut [u8]) -> CaliptraResult<()> {
         if mbox.regs().dlen().read() as usize != buf.len() {
             return Err(CaliptraError::DRIVER_MAILBOX_ENQUEUE_ERR);
         }
+
         let count = buf.len() / size_of::<u32>();
-        let (buf_words, suffix) = <[u32]>::ref_from_prefix_with_elems(buf, count)
+        let (buf_words, suffix) = <[u32]>::mut_from_prefix_with_elems(buf, count)
             .map_err(|_| CaliptraError::DRIVER_MAILBOX_ENQUEUE_ERR)?;
-        enqueue_words(mbox, &buf_words);
+        enqueue_words(mbox, buf_words);
+
         if !suffix.is_empty() && suffix.len() <= size_of::<u32>() {
             let mut last_word = 0_u32;
             last_word.as_mut_bytes()[..suffix.len()].copy_from_slice(suffix);
@@ -447,7 +449,7 @@ impl MailboxRecvTxn<'_> {
     ///
     /// Status of Operation
     ///
-    fn copy_response(&mut self, data: &[u8]) -> CaliptraResult<()> {
+    fn copy_response(&mut self, data: &mut [u8]) -> CaliptraResult<()> {
         if self.state != MailboxOpState::Execute {
             return Err(CaliptraError::DRIVER_MAILBOX_INVALID_STATE);
         }
@@ -472,7 +474,7 @@ impl MailboxRecvTxn<'_> {
     ///
     /// Status of Operation
     ///
-    pub fn send_response(&mut self, data: &[u8]) -> CaliptraResult<()> {
+    pub fn send_response(&mut self, data: &mut [u8]) -> CaliptraResult<()> {
         self.copy_response(data)?;
         self.complete(true)
     }
