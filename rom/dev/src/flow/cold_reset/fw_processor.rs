@@ -313,17 +313,18 @@ impl FirmwareProcessor {
 
                         let csr = csr_persistent_mem
                             .get()
-                            .ok_or(CaliptraError::FW_PROC_MAILBOX_UNPROVISIONED_CSR)?;
-                        let csr_len = csr_persistent_mem.csr_len;
+                            .ok_or(CaliptraError::FW_PROC_MAILBOX_GET_IDEV_CSR_UNPROVISIONED_CSR)?;
 
-                        if csr_len == 0 {
+                        if csr_persistent_mem.csr_len == IDevIDCsr::UNPROVISIONED_CSR {
                             /* CSR was never written to DCCM. This most likely means the
                              * gen_idev_id_csr manufacturing flag was not set before booting into
                              * ROM. */
-                            return Err(CaliptraError::FW_PROC_MAILBOX_UNPROVISIONED_CSR);
+                            return Err(
+                                CaliptraError::FW_PROC_MAILBOX_GET_IDEV_CSR_UNPROVISIONED_CSR,
+                            );
                         }
 
-                        resp.data_size = csr_len;
+                        resp.data_size = csr_persistent_mem.csr_len;
                         resp.data[..resp.data_size as usize].copy_from_slice(csr);
 
                         resp.populate_chksum();

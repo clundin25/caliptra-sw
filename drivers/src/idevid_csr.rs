@@ -25,9 +25,24 @@ impl Default for IDevIDCsr {
 }
 
 impl IDevIDCsr {
+    /// The `csr_len` field is set to this constant when a ROM image supports CSR generation but
+    /// the CSR generation flag was not enabled.
+    ///
+    /// This is used by the runtime to distinguish ROM images that support CSR generation from
+    /// ones that do not.
+    ///
+    /// u32::MAX is too large to be a valid CSR, so we use it to encode this state.
+    pub const UNPROVISIONED_CSR: u32 = u32::MAX;
     /// Get the CSR buffer
     pub fn get(&self) -> Option<&[u8]> {
+        if !self.is_valid() {
+            return None;
+        }
         self.csr.get(..self.csr_len as usize)
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.csr_len != Self::UNPROVISIONED_CSR
     }
 }
 

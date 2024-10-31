@@ -22,6 +22,7 @@ mod dpe_crypto;
 mod dpe_platform;
 mod drivers;
 pub mod fips;
+mod get_idv_csr;
 pub mod handoff;
 mod hmac;
 pub mod info;
@@ -57,6 +58,7 @@ pub use fips::FipsShutdownCmd;
 pub use fips::{fips_self_test_cmd, fips_self_test_cmd::SelfTestStatus};
 pub use populate_idev::PopulateIDevIdCertCmd;
 
+pub use get_idv_csr::GetIDVCSRCmd;
 pub use info::{FwInfoCmd, IDevIdInfoCmd};
 pub use invoke_dpe::InvokeDpeCmd;
 pub use pcr::IncrementPcrResetCounterCmd;
@@ -226,6 +228,7 @@ fn handle_command(drivers: &mut Drivers) -> CaliptraResult<MboxStatusE> {
         CommandId::SHUTDOWN => FipsShutdownCmd::execute(drivers),
         CommandId::SET_AUTH_MANIFEST => SetAuthManifestCmd::execute(drivers, cmd_bytes),
         CommandId::AUTHORIZE_AND_STASH => AuthorizeAndStashCmd::execute(drivers, cmd_bytes),
+        CommandId::GET_IDV_CSR => GetIDVCSRCmd::execute(drivers, cmd_bytes),
         _ => Err(CaliptraError::RUNTIME_UNIMPLEMENTED_COMMAND),
     }?;
 

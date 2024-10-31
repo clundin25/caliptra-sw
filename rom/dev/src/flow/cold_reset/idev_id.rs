@@ -205,6 +205,10 @@ impl InitDevIdLayer {
         //
         // A flag is asserted via JTAG interface to enable the generation of CSR
         if !env.soc_ifc.mfg_flag_gen_idev_id_csr() {
+            let mut dev_id_csr = IDevIDCsr::default();
+            dev_id_csr.csr_len = IDevIDCsr::UNPROVISIONED_CSR;
+
+            Self::write_csr_to_peristent_storage(env, &dev_id_csr)?;
             return Ok(());
         }
 
@@ -292,9 +296,11 @@ impl InitDevIdLayer {
         let mut csr_persistent_mem = &mut env.persistent_data.get_mut().idevid_csr;
         csr_persistent_mem.zeroize();
 
-        let csr_buf = csr.get().ok_or(CaliptraError::ROM_IDEVID_INVALID_CSR)?;
+        if csr.is_valid() {
+            let csr_buf = csr.get().ok_or(CaliptraError::ROM_IDEVID_INVALID_CSR)?;
+            csr_persistent_mem.csr[..csr.csr_len as usize].copy_from_slice(csr_buf);
+        }
 
-        csr_persistent_mem.csr[..csr.csr_len as usize].copy_from_slice(csr_buf);
         csr_persistent_mem.csr_len = csr.csr_len;
         Ok(())
     }

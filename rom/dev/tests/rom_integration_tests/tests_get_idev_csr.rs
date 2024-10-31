@@ -63,7 +63,8 @@ fn test_get_csr_generate_csr_flag_not_set() {
 
     let response = hw.mailbox_execute(CommandId::GET_IDV_CSR.into(), payload.as_bytes());
 
-    let expected_error =
-        ModelError::MailboxCmdFailed(CaliptraError::FW_PROC_MAILBOX_UNPROVISIONED_CSR.into());
+    let expected_error = ModelError::MailboxCmdFailed(
+        CaliptraError::FW_PROC_MAILBOX_GET_IDEV_CSR_UNPROVISIONED_CSR.into(),
+    );
     assert_eq!(expected_error, response.unwrap_err());
 }
