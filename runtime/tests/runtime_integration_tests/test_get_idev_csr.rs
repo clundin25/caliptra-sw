@@ -13,8 +13,10 @@ use crate::common::{run_rt_test, RuntimeTestArgs};
 
 #[test]
 fn test_get_csr() {
-    let mut args = RuntimeTestArgs::default();
-    args.test_mfg_flags = Some(MfgFlags::GENERATE_IDEVID_CSR);
+    let args = RuntimeTestArgs {
+        test_mfg_flags: Some(MfgFlags::GENERATE_IDEVID_CSR),
+        ..Default::default()
+    };
     let mut model = run_rt_test(args);
 
     let payload = MailboxReqHeader {
@@ -34,7 +36,7 @@ fn test_get_csr() {
     let csr_bytes = &get_idv_csr_resp.data[..get_idv_csr_resp.data_size as usize];
     assert_ne!([0; 512], csr_bytes);
 
-    assert!(X509Req::from_der(&csr_bytes).is_ok());
+    assert!(X509Req::from_der(csr_bytes).is_ok());
 }
 
 #[test]

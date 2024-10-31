@@ -82,8 +82,10 @@ fn test_stash_measurement() {
 
 #[test]
 fn test_pcr31_extended_upon_stash_measurement() {
-    let mut args = RuntimeTestArgs::default();
-    args.test_fwid = Some(&firmware::runtime_tests::MBOX);
+    let args = RuntimeTestArgs {
+        test_fwid: Some(&firmware::runtime_tests::MBOX),
+        ..Default::default()
+    };
     let mut model = run_rt_test(args);
 
     // Read PCR_ID_STASH_MEASUREMENT

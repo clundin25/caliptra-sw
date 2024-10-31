@@ -1,3 +1,5 @@
+// Licensed under the Apache-2.0 license
+
 use crate::Drivers;
 
 use caliptra_cfi_derive_git::cfi_impl_fn;
@@ -33,7 +35,7 @@ impl GetIDVCSRCmd {
                 0 => Err(CaliptraError::RUNTIME_GET_IDEV_ID_UNSUPPORTED_ROM),
                 _ => {
                     resp.data_size = csr_persistent_mem.csr_len;
-                    resp.data[..resp.data_size as usize].copy_from_slice(&csr);
+                    resp.data[..resp.data_size as usize].copy_from_slice(csr);
 
                     Ok(MailboxResp::GetIDevIDCSR(resp))
                 }

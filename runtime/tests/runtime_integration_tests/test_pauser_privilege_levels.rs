@@ -104,8 +104,10 @@ fn test_pl1_derive_context_dpe_context_thresholds() {
     let mut image_opts = ImageOptions::default();
     image_opts.vendor_config.pl0_pauser = None;
 
-    let mut args = RuntimeTestArgs::default();
-    args.test_image_options = Some(image_opts);
+    let args = RuntimeTestArgs {
+        test_image_options: Some(image_opts),
+        ..Default::default()
+    };
 
     let mut model = run_rt_test(args);
 
@@ -208,8 +210,10 @@ fn test_pl1_init_ctx_dpe_context_thresholds() {
     let mut image_opts = ImageOptions::default();
     image_opts.vendor_config.pl0_pauser = None;
 
-    let mut args = RuntimeTestArgs::default();
-    args.test_image_options = Some(image_opts);
+    let args = RuntimeTestArgs {
+        test_image_options: Some(image_opts),
+        ..Default::default()
+    };
 
     let mut model = run_rt_test(args);
 
@@ -252,8 +256,10 @@ fn test_populate_idev_cannot_be_called_from_pl1() {
     let mut image_opts = ImageOptions::default();
     image_opts.vendor_config.pl0_pauser = None;
 
-    let mut args = RuntimeTestArgs::default();
-    args.test_image_options = Some(image_opts);
+    let args = RuntimeTestArgs {
+        test_image_options: Some(image_opts),
+        ..Default::default()
+    };
     let mut model = run_rt_test(args);
 
     model.step_until(|m| {
@@ -281,8 +287,10 @@ fn test_stash_measurement_cannot_be_called_from_pl1() {
     let mut image_opts = ImageOptions::default();
     image_opts.vendor_config.pl0_pauser = None;
 
-    let mut args = RuntimeTestArgs::default();
-    args.test_image_options = Some(image_opts);
+    let args = RuntimeTestArgs {
+        test_image_options: Some(image_opts),
+        ..Default::default()
+    };
     let mut model = run_rt_test(args);
 
     model.step_until(|m| {
@@ -310,8 +318,10 @@ fn test_certify_key_x509_cannot_be_called_from_pl1() {
     let mut image_opts = ImageOptions::default();
     image_opts.vendor_config.pl0_pauser = None;
 
-    let mut args = RuntimeTestArgs::default();
-    args.test_image_options = Some(image_opts);
+    let args = RuntimeTestArgs {
+        test_image_options: Some(image_opts),
+        ..Default::default()
+    };
 
     let mut model = run_rt_test(args);
 
@@ -338,8 +348,10 @@ fn test_certify_key_extended_cannot_be_called_from_pl1() {
     let mut image_opts = ImageOptions::default();
     image_opts.vendor_config.pl0_pauser = None;
 
-    let mut args = RuntimeTestArgs::default();
-    args.test_image_options = Some(image_opts);
+    let args = RuntimeTestArgs {
+        test_image_options: Some(image_opts),
+        ..Default::default()
+    };
 
     let mut model = run_rt_test(args);
 
@@ -372,8 +384,10 @@ fn test_derive_context_cannot_be_called_from_pl1_if_changes_locality_to_pl0() {
     let mut image_opts = ImageOptions::default();
     image_opts.vendor_config.pl0_pauser = None;
 
-    let mut args = RuntimeTestArgs::default();
-    args.test_image_options = Some(image_opts);
+    let args = RuntimeTestArgs {
+        test_image_options: Some(image_opts),
+        ..Default::default()
+    };
 
     let mut model = run_rt_test(args);
 

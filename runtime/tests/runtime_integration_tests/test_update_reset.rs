@@ -97,8 +97,10 @@ fn test_tags_persistence() {
 
 #[test]
 fn test_context_tags_validation() {
-    let mut args = RuntimeTestArgs::default();
-    args.test_fwid = Some(&MBOX);
+    let args = RuntimeTestArgs {
+        test_fwid: Some(&MBOX),
+        ..Default::default()
+    };
     let mut model = run_rt_test(args);
 
     // make context_tags validation fail by "tagging" an inactive context
@@ -121,8 +123,10 @@ fn test_context_tags_validation() {
 
 #[test]
 fn test_context_has_tag_validation() {
-    let mut args = RuntimeTestArgs::default();
-    args.test_fwid = Some(&MBOX);
+    let args = RuntimeTestArgs {
+        test_fwid: Some(&MBOX),
+        ..Default::default()
+    };
     let mut model = run_rt_test(args);
 
     // make context_has_tag validation fail by "tagging" an inactive context
@@ -145,8 +149,10 @@ fn test_context_has_tag_validation() {
 
 #[test]
 fn test_dpe_validation_deformed_structure() {
-    let mut args = RuntimeTestArgs::default();
-    args.test_fwid = Some(&MBOX);
+    let args = RuntimeTestArgs {
+        test_fwid: Some(&MBOX),
+        ..Default::default()
+    };
     let mut model = run_rt_test(args);
 
     // read DPE after RT initialization
@@ -193,8 +199,10 @@ fn test_dpe_validation_deformed_structure() {
 
 #[test]
 fn test_dpe_validation_illegal_state() {
-    let mut args = RuntimeTestArgs::default();
-    args.test_fwid = Some(&MBOX);
+    let args = RuntimeTestArgs {
+        test_fwid: Some(&MBOX),
+        ..Default::default()
+    };
     let mut model = run_rt_test(args);
 
     // read DPE after RT initialization
@@ -239,8 +247,10 @@ fn test_dpe_validation_illegal_state() {
 
 #[test]
 fn test_dpe_validation_used_context_threshold_exceeded() {
-    let mut args = RuntimeTestArgs::default();
-    args.test_fwid = Some(&MBOX);
+    let args = RuntimeTestArgs {
+        test_fwid: Some(&MBOX),
+        ..Default::default()
+    };
     let mut model = run_rt_test(args);
 
     // read DPE after RT initialization

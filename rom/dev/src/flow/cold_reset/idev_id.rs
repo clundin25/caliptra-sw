@@ -205,8 +205,10 @@ impl InitDevIdLayer {
         //
         // A flag is asserted via JTAG interface to enable the generation of CSR
         if !env.soc_ifc.mfg_flag_gen_idev_id_csr() {
-            let mut dev_id_csr = IDevIDCsr::default();
-            dev_id_csr.csr_len = IDevIDCsr::UNPROVISIONED_CSR;
+            let dev_id_csr = IDevIDCsr {
+                csr_len: IDevIDCsr::UNPROVISIONED_CSR,
+                ..Default::default()
+            };
 
             Self::write_csr_to_peristent_storage(env, &dev_id_csr)?;
             return Ok(());

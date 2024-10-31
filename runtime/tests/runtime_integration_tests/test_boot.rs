@@ -29,8 +29,10 @@ fn test_standard() {
 
 #[test]
 fn test_boot() {
-    let mut args = RuntimeTestArgs::default();
-    args.test_fwid = Some(&firmware::runtime_tests::BOOT);
+    let args = RuntimeTestArgs {
+        test_fwid: Some(&firmware::runtime_tests::BOOT),
+        ..Default::default()
+    };
     let mut model = run_rt_test(args);
 
     model.step_until_exit_success().unwrap();
@@ -40,8 +42,10 @@ fn test_boot() {
 /// This test differs from the drivers' test_persistent() in that it is ran with the "runtime" flag so
 /// it allows us to test conditionally compiled runtime-only persistent data that ROM/FMC may have corrupted.
 fn test_persistent_data() {
-    let mut args = RuntimeTestArgs::default();
-    args.test_fwid = Some(&firmware::runtime_tests::PERSISTENT_RT);
+    let args = RuntimeTestArgs {
+        test_fwid: Some(&firmware::runtime_tests::PERSISTENT_RT),
+        ..Default::default()
+    };
     let mut model = run_rt_test(args);
 
     model.step_until_exit_success().unwrap();
@@ -150,8 +154,10 @@ fn test_stress_update() {
 
 #[test]
 fn test_boot_tci_data() {
-    let mut args = RuntimeTestArgs::default();
-    args.test_fwid = Some(&firmware::runtime_tests::MBOX);
+    let args = RuntimeTestArgs {
+        test_fwid: Some(&firmware::runtime_tests::MBOX),
+        ..Default::default()
+    };
     let mut model = run_rt_test(args);
 
     let rt_journey_pcr_resp = model.mailbox_execute(0x1000_0000, &[]).unwrap().unwrap();

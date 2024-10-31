@@ -58,8 +58,10 @@ fn test_rt_cert_with_custom_dates() {
 
     opts.owner_config = Some(own_config);
 
-    let mut args = RuntimeTestArgs::default();
-    args.test_image_options = Some(opts);
+    let args = RuntimeTestArgs {
+        test_image_options: Some(opts),
+        ..Default::default()
+    };
     let mut model = run_rt_test(args);
 
     let payload = MailboxReqHeader {

@@ -14,12 +14,14 @@ const HW_REV_ID: u32 = if cfg!(feature = "hw-1.0") { 0x1 } else { 0x11 };
 
 #[test]
 fn test_fips_version() {
-    let mut args = RuntimeTestArgs::default();
-    args.test_image_options = Some(ImageOptions {
-        fmc_version: version::get_fmc_version(),
-        app_version: version::get_runtime_version(),
+    let args = RuntimeTestArgs {
+        test_image_options: Some(ImageOptions {
+            fmc_version: version::get_fmc_version(),
+            app_version: version::get_runtime_version(),
+            ..Default::default()
+        }),
         ..Default::default()
-    });
+    };
     let mut model = run_rt_test(args);
 
     model.step_until(|m| m.soc_mbox().status().read().mbox_fsm_ps().mbox_idle());
