@@ -811,7 +811,13 @@ Command Code: `0x4944_4352` ("IDCR")
 | data\_size    | u32      | Length in bytes of the valid data in the data field.                       |
 | data          | u8[...]  | DER-encoded IDevID certificate signing request.                            |
 
-The `mfg_flag_gen_idev_id_csr` manufacturing flag **MUST** have been set to generate a CSR. If the CSR was not previously provisioned, this command will return `FW_PROC_MAILBOX_UNPROVISIONED_CSR(0x0102000A)`. 
+The `mfg_flag_gen_idev_id_csr` manufacturing flag **MUST** have been set to generate a CSR. 
+
+When called from ROM, if the CSR was not previously provisioned this command will return `FW_PROC_MAILBOX_UNPROVISIONED_CSR(0x0102000A)`. 
+
+When called from runtime, if the CSR was not previously provisioned this command will return `RUNTIME_GET_IDEV_ID_UNPROVISIONED(0x000E0050)`. If the ROM did not support CSR generation, this command will return `RUNTIME_GET_IDEV_ID_UNSUPPORTED_ROM(0x000E0051)`.
+
+
 
 When the `mfg_flag_gen_idev_id_csr` flag has been set, the SoC **MUST** wait for the `flow_status_set_idevid_csr_ready` bit to be set by Caliptra. Once set, the SoC **MUST** clear the `mfg_flag_gen_idev_id_csr` flag for Caliptra to progress.
 
