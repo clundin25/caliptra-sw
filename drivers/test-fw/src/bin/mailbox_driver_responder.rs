@@ -11,7 +11,7 @@ use caliptra_test_harness::{self, println};
 
 use caliptra_drivers::{self, Mailbox};
 use caliptra_registers::mbox::MboxCsr;
-use zerocopy::{IntoBytes, TryFromBytes};
+use zerocopy::IntoBytes;
 
 #[panic_handler]
 pub fn panic(_info: &core::panic::PanicInfo) -> ! {
