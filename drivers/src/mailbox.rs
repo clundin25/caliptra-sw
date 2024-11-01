@@ -290,14 +290,14 @@ impl<'a> MailboxRecvPeek<'a> {
 
 /// Mailbox Fifo abstraction
 mod fifo {
-    use zerocopy::native_endian::U32;
+    use zerocopy::Unalign;
 
     use super::*;
 
-    fn dequeue_words(mbox: &mut MboxCsr, buf: &mut [U32]) {
+    fn dequeue_words(mbox: &mut MboxCsr, buf: &mut [Unalign<u32>]) {
         let mbox = mbox.regs_mut();
         for word in buf.iter_mut() {
-            word.set(mbox.dataout().read());
+            *word = Unalign::new(mbox.dataout().read());
         }
     }
 
@@ -307,10 +307,11 @@ mod fifo {
             buf = &mut buf[..dlen_bytes];
         }
 
-        let len_words = buf.len() / size_of::<U32>();
-        let (buf_words, suffix) = <[U32]>::mut_from_prefix_with_elems(buf, len_words).unwrap();
+        let len_words = buf.len() / size_of::<u32>();
+        let (buf_words, suffix) =
+            <[Unalign<u32>]>::mut_from_prefix_with_elems(buf, len_words).unwrap();
         dequeue_words(mbox, buf_words);
-        if !suffix.is_empty() && suffix.len() <= size_of::<U32>() {
+        if !suffix.is_empty() && suffix.len() <= size_of::<u32>() {
             let last_word = mbox.regs().dataout().read();
             let suffix_len = suffix.len();
             suffix
@@ -319,7 +320,7 @@ mod fifo {
         }
     }
 
-    fn enqueue_words(mbox: &mut MboxCsr, buf: &[U32]) {
+    fn enqueue_words(mbox: &mut MboxCsr, buf: &[Unalign<u32>]) {
         let mbox = mbox.regs_mut();
         for word in buf {
             mbox.datain().write(|_| word.get());
@@ -332,13 +333,13 @@ mod fifo {
         if mbox.regs().dlen().read() as usize != buf.len() {
             return Err(CaliptraError::DRIVER_MAILBOX_ENQUEUE_ERR);
         }
-        let count = buf.len() / size_of::<U32>();
-        let (buf_words, suffix) = <[U32]>::ref_from_prefix_with_elems(buf, count).unwrap();
+        let count = buf.len() / size_of::<u32>();
+        let (buf_words, suffix) = <[Unalign<u32>]>::ref_from_prefix_with_elems(buf, count).unwrap();
         enqueue_words(mbox, buf_words);
-        if !suffix.is_empty() && suffix.len() <= size_of::<U32>() {
+        if !suffix.is_empty() && suffix.len() <= size_of::<u32>() {
             let mut last_word = 0_u32;
             last_word.as_mut_bytes()[..suffix.len()].copy_from_slice(suffix);
-            enqueue_words(mbox, &[U32::new(last_word)]);
+            enqueue_words(mbox, &[Unalign::new(last_word)]);
         }
         Ok(())
     }
