@@ -94,7 +94,7 @@ impl InvokeDpeCmd {
                 )),
                 Command::InitCtx(cmd) => {
                     // InitCtx can only create new contexts if they are simulation contexts.
-                    if InitCtxCmd::flag_is_simulation(&cmd) {
+                    if InitCtxCmd::flag_is_simulation(cmd) {
                         dpe_context_threshold_err?;
                     }
                     cmd.execute(dpe, &mut env, locality)
@@ -103,10 +103,10 @@ impl InvokeDpeCmd {
                     // If the recursive flag is not set, DeriveContext will generate a new context.
                     // If recursive _is_ set, it will extend the existing one, which will not count
                     // against the context threshold.
-                    if !DeriveContextCmd::is_recursive(&cmd) {
+                    if !DeriveContextCmd::is_recursive(cmd) {
                         dpe_context_threshold_err?;
                     }
-                    if DeriveContextCmd::changes_locality(&cmd)
+                    if DeriveContextCmd::changes_locality(cmd)
                         && cmd.target_locality == pl0_pauser
                         && caller_privilege_level != PauserPrivileges::PL0
                     {

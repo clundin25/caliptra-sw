@@ -431,7 +431,7 @@ fn hash_pcr_log_entries(initial_pcr: &[u8; 48], pcr_entry_arr: &[u8], pcr_id: Pc
             continue;
         }
 
-        hash_pcr_log_entry(&entry, &mut pcr);
+        hash_pcr_log_entry(entry, &mut pcr);
     }
 
     pcr

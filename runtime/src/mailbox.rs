@@ -136,7 +136,7 @@ impl Mailbox {
     pub fn copy_bytes_to_mbox(&mut self, buf: &[u8]) -> CaliptraResult<()> {
         let count = buf.len() / size_of::<U32>();
         let (buf_words, suffix) = <[U32]>::ref_from_prefix_with_elems(buf, count).unwrap();
-        self.copy_words_to_mbox(&buf_words);
+        self.copy_words_to_mbox(buf_words);
         if !suffix.is_empty() && suffix.len() <= size_of::<U32>() {
             let mut last_word = 0_u32;
             last_word.as_mut_bytes()[..suffix.len()].copy_from_slice(suffix);

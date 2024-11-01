@@ -329,7 +329,7 @@ pub fn exec_cmd_stash_measurement<T: HwModel>(hw: &mut T) {
     assert_eq!(stash_measurement_resp.dpe_result, 0);
 }
 
-pub fn exec_fw_info<T: HwModel>(hw: &mut T, fw_image: &Vec<u8>) {
+pub fn exec_fw_info<T: HwModel>(hw: &mut T, fw_image: &[u8]) {
     let payload = MailboxReqHeader {
         chksum: caliptra_common::checksum::calc_checksum(u32::from(CommandId::FW_INFO), &[]),
     };
@@ -340,7 +340,7 @@ pub fn exec_fw_info<T: HwModel>(hw: &mut T, fw_image: &Vec<u8>) {
     )
     .unwrap();
 
-    let (manifest, _) = ImageManifest::read_from_prefix(&**fw_image).unwrap();
+    let (manifest, _) = ImageManifest::read_from_prefix(fw_image).unwrap();
     // Verify command-specific response data
     assert_eq!(fw_info_resp.fmc_revision, manifest.fmc.revision);
     assert_eq!(fw_info_resp.runtime_revision, manifest.runtime.revision);
