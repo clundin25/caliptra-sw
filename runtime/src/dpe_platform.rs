@@ -117,14 +117,14 @@ impl Platform for DpePlatform<'_> {
             .map_err(|e| PlatformError::IssuerNameError(e.get_error_detail().unwrap_or(0)))?;
 
         let name = Name {
-            cn: DirectoryString::Utf8String(CALIPTRA_CN),
-            serial: DirectoryString::PrintableString(&serial),
+            cn: CALIPTRA_CN,
+            serial: &serial,
         };
-        let issuer_len = issuer_writer
-            .encode_rdn(&name)
-            .map_err(|e| PlatformError::IssuerNameError(e.get_error_detail().unwrap_or(0)))?;
 
-        Ok(issuer_len)
+        let rdn = CertWriter::get_rdn(&name).unwrap();
+        let bytes_written = issuer_writer.encode_der(&rdn).unwrap();
+
+        Ok(bytes_written)
     }
 
     /// See X509::subj_key_id in fmc/src/flow/x509.rs for code that generates the
