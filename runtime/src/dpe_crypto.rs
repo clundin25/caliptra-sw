@@ -129,11 +129,8 @@ impl<'a> DpeCrypto<'a> {
                         &Ecc384Seed::Key(KeyReadArgs::new(KEY_ID_TMP)),
                         &Array4x12::default(),
                         self.trng,
-                        KeyWriteArgs::new(
-                            key_id,
-                            KeyUsage::default().set_ecc_private_key_en(),
-                        )
-                        .into(),
+                        KeyWriteArgs::new(key_id, KeyUsage::default().set_ecc_private_key_en())
+                            .into(),
                     )
                     .map_err(|e| CryptoError::CryptoLibError(u32::from(e)))?;
                 let pub_key = EcdsaPub {
