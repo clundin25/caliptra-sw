@@ -54,6 +54,8 @@ impl CommandId {
 
     // The get IDevID CSR command.
     pub const GET_IDEV_CSR: Self = Self(0x4944_4352); // "IDCR"
+
+    pub const SIGN_WITH_EXPORTED: Self = Self(0x5357_4554); // "SWET"
 }
 
 impl From<u32> for CommandId {
@@ -153,6 +155,7 @@ pub enum MailboxResp {
     CertifyKeyExtended(CertifyKeyExtendedResp),
     AuthorizeAndStash(AuthorizeAndStashResp),
     GetIdevCsr(GetIdevCsrResp),
+    SignWithExported(SignWithExportedResp),
 }
 
 impl MailboxResp {
@@ -174,6 +177,7 @@ impl MailboxResp {
             MailboxResp::CertifyKeyExtended(resp) => Ok(resp.as_bytes()),
             MailboxResp::AuthorizeAndStash(resp) => Ok(resp.as_bytes()),
             MailboxResp::GetIdevCsr(resp) => Ok(resp.as_bytes()),
+            MailboxResp::SignWithExported(resp) => Ok(resp.as_bytes()),
         }
     }
 
@@ -195,6 +199,7 @@ impl MailboxResp {
             MailboxResp::CertifyKeyExtended(resp) => Ok(resp.as_mut_bytes()),
             MailboxResp::AuthorizeAndStash(resp) => Ok(resp.as_mut_bytes()),
             MailboxResp::GetIdevCsr(resp) => Ok(resp.as_mut_bytes()),
+            MailboxResp::SignWithExported(resp) => Ok(resp.as_mut_bytes()),
         }
     }
 
@@ -253,6 +258,7 @@ pub enum MailboxReq {
     CertifyKeyExtended(CertifyKeyExtendedReq),
     SetAuthManifest(SetAuthManifestReq),
     AuthorizeAndStash(AuthorizeAndStashReq),
+    SignWithExported(SignWithExportedReq),
 }
 
 impl MailboxReq {
@@ -278,6 +284,7 @@ impl MailboxReq {
             MailboxReq::CertifyKeyExtended(req) => Ok(req.as_bytes()),
             MailboxReq::SetAuthManifest(req) => Ok(req.as_bytes()),
             MailboxReq::AuthorizeAndStash(req) => Ok(req.as_bytes()),
+            MailboxReq::SignWithExported(req) => Ok(req.as_bytes()),
         }
     }
 
@@ -303,6 +310,7 @@ impl MailboxReq {
             MailboxReq::CertifyKeyExtended(req) => Ok(req.as_mut_bytes()),
             MailboxReq::SetAuthManifest(req) => Ok(req.as_mut_bytes()),
             MailboxReq::AuthorizeAndStash(req) => Ok(req.as_mut_bytes()),
+            MailboxReq::SignWithExported(req) => Ok(req.as_mut_bytes()),
         }
     }
 
@@ -328,6 +336,7 @@ impl MailboxReq {
             MailboxReq::CertifyKeyExtended(_) => CommandId::CERTIFY_KEY_EXTENDED,
             MailboxReq::SetAuthManifest(_) => CommandId::SET_AUTH_MANIFEST,
             MailboxReq::AuthorizeAndStash(_) => CommandId::AUTHORIZE_AND_STASH,
+            MailboxReq::SignWithExported(_) => CommandId::SIGN_WITH_EXPORTED,
         }
     }
 
@@ -1006,6 +1015,60 @@ impl Default for GetIdevCsrResp {
             hdr: MailboxRespHeader::default(),
             data_size: 0,
             data: [0u8; Self::DATA_MAX_SIZE],
+        }
+    }
+}
+
+// SIGN_WITH_EXPORTED
+#[repr(C)]
+#[derive(Debug, IntoBytes, FromBytes, KnownLayout, Immutable, PartialEq, Eq)]
+pub struct SignWithExportedReq {
+    pub hdr: MailboxReqHeader,
+    pub exported_cdi: [u8; Self::EXPORTED_CDI_MAX_SIZE],
+    pub digest: [u8; Self::MAX_DIGEST_SIZE],
+}
+
+impl Default for SignWithExportedReq {
+    fn default() -> Self {
+        Self {
+            hdr: MailboxReqHeader::default(),
+            exported_cdi: [0u8; Self::EXPORTED_CDI_MAX_SIZE],
+            digest: [0u8; Self::MAX_DIGEST_SIZE],
+        }
+    }
+}
+
+impl SignWithExportedReq {
+    pub const EXPORTED_CDI_MAX_SIZE: usize = 32;
+    pub const MAX_DIGEST_SIZE: usize = 48;
+}
+
+impl Request for SignWithExportedReq {
+    const ID: CommandId = CommandId::SIGN_WITH_EXPORTED;
+    type Resp = SignWithExportedResp;
+}
+
+#[repr(C)]
+#[derive(Debug, IntoBytes, FromBytes, KnownLayout, Immutable, PartialEq, Eq)]
+pub struct SignWithExportedResp {
+    pub hdr: MailboxRespHeader,
+    pub signature_r: [u8; Self::R_SIZE],
+    pub signature_s: [u8; Self::S_SIZE],
+}
+
+impl SignWithExportedResp {
+    pub const R_SIZE: usize = 48;
+    pub const S_SIZE: usize = 48;
+}
+
+impl ResponseVarSize for SignWithExportedResp {}
+
+impl Default for SignWithExportedResp {
+    fn default() -> Self {
+        Self {
+            hdr: MailboxRespHeader::default(),
+            signature_r: [0u8; Self::R_SIZE],
+            signature_s: [0u8; Self::S_SIZE],
         }
     }
 }
