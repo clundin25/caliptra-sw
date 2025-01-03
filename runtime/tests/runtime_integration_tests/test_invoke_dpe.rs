@@ -124,7 +124,7 @@ fn test_invoke_dpe_sign_and_certify_key_cmds() {
     };
 
     let sig = EcdsaSig::from_private_components(
-        BigNum::from_slice(&sign_resp.sig_r_or_hmac).unwrap(),
+        BigNum::from_slice(&sign_resp.sig_r).unwrap(),
         BigNum::from_slice(&sign_resp.sig_s).unwrap(),
     )
     .unwrap();
@@ -149,7 +149,7 @@ fn test_invoke_dpe_symmetric_sign() {
     let sign_cmd = SignCmd {
         handle: ContextHandle::default(),
         label: TEST_LABEL,
-        flags: SignFlags::IS_SYMMETRIC,
+        flags: SignFlags::empty(),
         digest: TEST_DIGEST,
     };
     let resp = execute_dpe_cmd(
@@ -162,7 +162,7 @@ fn test_invoke_dpe_symmetric_sign() {
     };
 
     // r contains the hmac so it should not be all 0s
-    assert_ne!(sign_resp.sig_r_or_hmac, [0u8; 48]);
+    assert_ne!(sign_resp.sig_r, [0u8; 48]);
     // s must be all 0s for hmac sign
     assert_eq!(sign_resp.sig_s, [0u8; 48]);
 }
