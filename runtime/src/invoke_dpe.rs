@@ -131,6 +131,7 @@ impl InvokeDpeCmd {
                     destroy_ctx_resp
                 }
                 Command::Sign(cmd) => cmd.execute(dpe, &mut env, locality),
+                Command::SignWithExported(cmd) => cmd.execute(dpe, &mut env, locality),
                 Command::RotateCtx(cmd) => cmd.execute(dpe, &mut env, locality),
                 Command::GetCertificateChain(cmd) => cmd.execute(dpe, &mut env, locality),
             };

@@ -210,7 +210,7 @@ impl<'a> Crypto for DpeCrypto<'a> {
     }
 
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
-    fn derive_cdi_exported(
+    fn derive_exported_cdi(
         &mut self,
         algs: AlgLen,
         measurement: &Digest,
@@ -227,6 +227,13 @@ impl<'a> Crypto for DpeCrypto<'a> {
         info: &[u8],
     ) -> Result<Self::Cdi, CryptoError> {
         self.derive_cdi_inner(algs, measurement, info, KEY_ID_DPE_CDI)
+    }
+
+    #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
+    fn get_exported_cdi(
+        &mut self,
+    ) -> Result<Self::Cdi, CryptoError> {
+        Ok(KEY_ID_EXPORTED_DPE_CDI)
     }
 
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
