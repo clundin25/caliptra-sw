@@ -23,7 +23,7 @@ use dpe::{
     commands::{Command, CommandHdr},
     response::{
         CertifyKeyResp, DeriveContextResp, GetCertificateChainResp, GetProfileResp, NewHandleResp,
-        Response, ResponseHdr, SignResp, SignWithExportedResp
+        Response, ResponseHdr, SignResp, SignWithExportedResp,
     },
 };
 use openssl::{
@@ -206,7 +206,9 @@ fn parse_dpe_response(dpe_cmd: &mut Command, resp_bytes: &[u8]) -> Response {
             Response::RotateCtx(NewHandleResp::read_from_bytes(resp_bytes).unwrap())
         }
         Command::Sign(_) => Response::Sign(SignResp::read_from_bytes(resp_bytes).unwrap()),
-        Command::SignWithExported(_) => Response::SignWithExported(SignWithExportedResp::read_from_bytes(resp_bytes).unwrap()),
+        Command::SignWithExported(_) => {
+            Response::SignWithExported(SignWithExportedResp::read_from_bytes(resp_bytes).unwrap())
+        }
     }
 }
 

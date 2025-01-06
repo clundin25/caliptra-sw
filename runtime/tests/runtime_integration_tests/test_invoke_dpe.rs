@@ -139,7 +139,7 @@ fn test_invoke_dpe_sign_and_certify_key_cmds() {
 }
 
 #[test]
-fn test_invoke_dpe_symmetric_sign() {
+fn test_invoke_dpe_asymmetric_sign() {
     let mut model = run_rt_test(RuntimeTestArgs::default());
 
     model.step_until(|m| {
@@ -164,7 +164,7 @@ fn test_invoke_dpe_symmetric_sign() {
     // r contains the hmac so it should not be all 0s
     assert_ne!(sign_resp.sig_r, [0u8; 48]);
     // s must be all 0s for hmac sign
-    assert_eq!(sign_resp.sig_s, [0u8; 48]);
+    assert_ne!(sign_resp.sig_s, [0u8; 48]);
 }
 
 #[test]

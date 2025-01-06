@@ -64,7 +64,6 @@ impl<'a> DpeCrypto<'a> {
         }
     }
 
-    #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
     fn derive_cdi_inner(
         &mut self,
         algs: AlgLen,
@@ -100,7 +99,6 @@ impl<'a> DpeCrypto<'a> {
         }
     }
 
-    #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
     fn derive_key_pair_inner(
         &mut self,
         algs: AlgLen,
