@@ -230,9 +230,7 @@ impl<'a> Crypto for DpeCrypto<'a> {
     }
 
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
-    fn get_exported_cdi(
-        &mut self,
-    ) -> Result<Self::Cdi, CryptoError> {
+    fn get_exported_cdi(&mut self) -> Result<Self::Cdi, CryptoError> {
         Ok(KEY_ID_EXPORTED_DPE_CDI)
     }
 
