@@ -258,7 +258,7 @@ pub enum MailboxReq {
     CertifyKeyExtended(CertifyKeyExtendedReq),
     SetAuthManifest(SetAuthManifestReq),
     AuthorizeAndStash(AuthorizeAndStashReq),
-    SignWithExported(SignWithExportedResp),
+    SignWithExported(SignWithExportedReq),
 }
 
 impl MailboxReq {
@@ -709,7 +709,7 @@ pub struct InvokeDpeResp {
     pub data: [u8; InvokeDpeResp::DATA_MAX_SIZE], // variable length
 }
 impl InvokeDpeResp {
-    pub const DATA_MAX_SIZE: usize = 2200;
+    pub const DATA_MAX_SIZE: usize = 7000; // Temporarily avoid DPE buffer overrun.
 }
 impl ResponseVarSize for InvokeDpeResp {}
 
@@ -1039,9 +1039,8 @@ impl Default for SignWithExportedReq {
 }
 
 impl SignWithExportedReq {
-    pub const EXPORTED_CDI_MAX_SIZE: usize = 512;
-    pub const MAX_DIGEST_SIZE: usize = 64; // TODO(clundin): Is this a reasonable max size? This accommodates
-                                           // SHA-512 but DPE only supports SHA-384.
+    pub const EXPORTED_CDI_MAX_SIZE: usize = 32;
+    pub const MAX_DIGEST_SIZE: usize = 48; // TODO(clundin): Is this a reasonable max size? DPE only supports up to SHA-384.
 }
 
 impl Request for SignWithExportedReq {

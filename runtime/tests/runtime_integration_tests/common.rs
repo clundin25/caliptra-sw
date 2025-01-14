@@ -22,8 +22,8 @@ use caliptra_hw_model::{
 use dpe::{
     commands::{Command, CommandHdr},
     response::{
-        CertifyKeyResp, DeriveContextResp, GetCertificateChainResp, GetProfileResp, NewHandleResp,
-        Response, ResponseHdr, SignResp, SignWithExportedResp,
+        CertifyKeyResp, DeriveContextExportedCdiResp, DeriveContextResp, GetCertificateChainResp,
+        GetProfileResp, NewHandleResp, Response, ResponseHdr, SignResp,
     },
 };
 use openssl::{
@@ -161,7 +161,6 @@ fn get_cmd_id(dpe_cmd: &mut Command) -> u32 {
         Command::DeriveContext(_) => Command::DERIVE_CONTEXT,
         Command::CertifyKey(_) => Command::CERTIFY_KEY,
         Command::Sign(_) => Command::SIGN,
-        Command::SignWithExported(_) => Command::SIGN_WITH_EXPORTED,
         Command::RotateCtx(_) => Command::ROTATE_CONTEXT_HANDLE,
         Command::DestroyCtx(_) => Command::DESTROY_CONTEXT,
         Command::GetCertificateChain(_) => Command::GET_CERTIFICATE_CHAIN,
@@ -178,7 +177,6 @@ fn as_bytes<'a>(dpe_cmd: &'a mut Command) -> &'a [u8] {
         Command::InitCtx(cmd) => cmd.as_bytes(),
         Command::RotateCtx(cmd) => cmd.as_bytes(),
         Command::Sign(cmd) => cmd.as_bytes(),
-        Command::SignWithExported(cmd) => cmd.as_bytes(),
     }
 }
 
@@ -187,9 +185,11 @@ fn parse_dpe_response(dpe_cmd: &mut Command, resp_bytes: &[u8]) -> Response {
         Command::CertifyKey(_) => {
             Response::CertifyKey(CertifyKeyResp::read_from_bytes(resp_bytes).unwrap())
         }
-        Command::DeriveContext(_) => {
-            Response::DeriveContext(DeriveContextResp::read_from_bytes(resp_bytes).unwrap())
-        }
+        Command::DeriveContext(_) => Response::DeriveContextExportedCdi(
+            // TODO(clundin): We need to infer the return type by the flags passed into the cmd.
+            // This type is based off the EXPORT_CDI flag.
+            DeriveContextExportedCdiResp::read_from_bytes(resp_bytes).unwrap(),
+        ),
         Command::GetCertificateChain(_) => Response::GetCertificateChain(
             GetCertificateChainResp::read_from_bytes(resp_bytes).unwrap(),
         ),
@@ -206,9 +206,6 @@ fn parse_dpe_response(dpe_cmd: &mut Command, resp_bytes: &[u8]) -> Response {
             Response::RotateCtx(NewHandleResp::read_from_bytes(resp_bytes).unwrap())
         }
         Command::Sign(_) => Response::Sign(SignResp::read_from_bytes(resp_bytes).unwrap()),
-        Command::SignWithExported(_) => {
-            Response::SignWithExported(SignWithExportedResp::read_from_bytes(resp_bytes).unwrap())
-        }
     }
 }
 

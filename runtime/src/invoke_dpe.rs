@@ -113,6 +113,11 @@ impl InvokeDpeCmd {
                     {
                         return Err(CaliptraError::RUNTIME_INCORRECT_PAUSER_PRIVILEGE_LEVEL);
                     }
+                    // TODO(clundin): Document this better; TL;DR if the export CDI flag is set we
+                    // need to pass a persistent back end for it.
+                    // Also this should only be needed when the export CDI flag is set, but it's
+                    // okay to always do it.
+                    env.crypto.with_exported_cdi_slots(&mut drivers.exported_cdi_slots);
                     cmd.execute(dpe, &mut env, locality)
                 }
                 Command::CertifyKey(cmd) => {
@@ -131,7 +136,6 @@ impl InvokeDpeCmd {
                     destroy_ctx_resp
                 }
                 Command::Sign(cmd) => cmd.execute(dpe, &mut env, locality),
-                Command::SignWithExported(cmd) => cmd.execute(dpe, &mut env, locality),
                 Command::RotateCtx(cmd) => cmd.execute(dpe, &mut env, locality),
                 Command::GetCertificateChain(cmd) => cmd.execute(dpe, &mut env, locality),
             };

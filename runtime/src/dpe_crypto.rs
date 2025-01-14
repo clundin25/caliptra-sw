@@ -14,6 +14,7 @@ Abstract:
 
 use core::cmp::min;
 
+use arrayvec::ArrayVec;
 use caliptra_cfi_derive_git::cfi_impl_fn;
 use caliptra_cfi_lib_git::{cfi_assert, cfi_assert_eq, cfi_launder};
 use caliptra_common::keyids::{
@@ -25,9 +26,15 @@ use caliptra_drivers::{
     KeyVault, KeyWriteArgs, Sha384, Sha384DigestOp, Trng,
 };
 use crypto::{AlgLen, Crypto, CryptoBuf, CryptoError, Digest, EcdsaPub, EcdsaSig, Hasher};
-use dpe::x509::MeasurementData;
+use dpe::{x509::MeasurementData, MAX_EXPORTED_CDI_SIZE};
 use zerocopy::IntoBytes;
 use zeroize::Zeroize;
+
+// Currently only can export CDI once, but in the future we may want to support multiple exported
+// CDI handles at the cost of using more KeyVault slots.
+pub const EXPORTED_HANDLES_NUM: usize = 1;
+pub type ExportedCdiHandle = [u8; MAX_EXPORTED_CDI_SIZE];
+pub type ExportedCdiHandles = ArrayVec<(KeyId, ExportedCdiHandle), EXPORTED_HANDLES_NUM>;
 
 pub struct DpeCrypto<'a> {
     sha384: &'a mut Sha384,
@@ -38,6 +45,9 @@ pub struct DpeCrypto<'a> {
     rt_pub_key: &'a mut Ecc384PubKey,
     key_id_rt_cdi: KeyId,
     key_id_rt_priv_key: KeyId,
+    exported_cdi_slots: Option<
+        &'a mut ExportedCdiHandles,
+    >,
 }
 
 impl<'a> DpeCrypto<'a> {
@@ -61,7 +71,15 @@ impl<'a> DpeCrypto<'a> {
             rt_pub_key,
             key_id_rt_cdi,
             key_id_rt_priv_key,
+            exported_cdi_slots: None,
         }
+    }
+
+    pub fn with_exported_cdi_slots(
+        &mut self,
+        slots: &'a mut ExportedCdiHandles,
+    ) {
+        self.exported_cdi_slots = Some(slots);
     }
 
     fn derive_cdi_inner(
@@ -227,9 +245,41 @@ impl<'a> Crypto for DpeCrypto<'a> {
         self.derive_cdi_inner(algs, measurement, info, KEY_ID_DPE_CDI)
     }
 
-    #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
-    fn get_exported_cdi(&mut self) -> Result<Self::Cdi, CryptoError> {
-        Ok(KEY_ID_EXPORTED_DPE_CDI)
+    //TODO(clundin): Wrap this with CFI?
+    fn get_exported_cdi_handle(
+        &mut self,
+        cdi: &Self::Cdi,
+    ) -> Result<[u8; MAX_EXPORTED_CDI_SIZE], CryptoError> {
+        let mut exported_cdi_handle = [0; MAX_EXPORTED_CDI_SIZE];
+        self.rand_bytes(&mut exported_cdi_handle)?;
+
+        // TODO(clundin): Add a real error.
+        let Some(ref mut export_cdi_slots) = self.exported_cdi_slots else { Err(CryptoError::ExportedCdiHandleLimitExceeded)? };
+        if export_cdi_slots.is_full() {
+            return Err(CryptoError::ExportedCdiHandleLimitExceeded);
+        }
+
+        for slot in export_cdi_slots.iter() {
+            if slot.0 == *cdi {
+                return Err(CryptoError::ExportedCdiHandleLimitExceeded);
+            }
+        }
+        export_cdi_slots.push((cdi.clone(), exported_cdi_handle));
+        Ok(exported_cdi_handle)
+    }
+
+    //TODO(clundin): Wrap this with CFI?
+    fn get_cdi_from_exported_handle(
+        &mut self,
+        exported_cdi_handle: &[u8; MAX_EXPORTED_CDI_SIZE],
+    ) -> Option<Self::Cdi> {
+        let Some(ref export_cdi_slots) = self.exported_cdi_slots else { return None };
+        for (cdi, handle) in export_cdi_slots.iter() {
+            if handle == exported_cdi_handle {
+                return Some(cdi.clone());
+            }
+        }
+        None
     }
 
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]

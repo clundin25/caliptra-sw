@@ -56,9 +56,10 @@ use dpe::{
     support::Support,
     DPE_PROFILE,
 };
+use crate::dpe_crypto::ExportedCdiHandles;
 
 use core::cmp::Ordering::{Equal, Greater};
-use crypto::{AlgLen, Crypto, CryptoBuf, Hasher};
+use crypto::{AlgLen, Crypto, CryptoBuf, Hasher, MAX_EXPORTED_CDI_SIZE};
 use zerocopy::IntoBytes;
 
 #[derive(PartialEq, Clone)]
@@ -108,6 +109,7 @@ pub struct Drivers {
     pub is_shutdown: bool,
 
     pub dmtf_device_info: Option<ArrayVec<u8, { AddSubjectAltNameReq::MAX_DEVICE_INFO_LEN }>>,
+    pub exported_cdi_slots: ExportedCdiHandles,
 }
 
 impl Drivers {
@@ -146,6 +148,7 @@ impl Drivers {
             cert_chain: ArrayVec::new(),
             is_shutdown: false,
             dmtf_device_info: None,
+            exported_cdi_slots: ArrayVec::new(),
         })
     }
 
