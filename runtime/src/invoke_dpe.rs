@@ -17,7 +17,7 @@ use crate::{
 };
 use caliptra_cfi_derive_git::cfi_impl_fn;
 use caliptra_common::mailbox_api::{InvokeDpeReq, InvokeDpeResp, MailboxResp, MailboxRespHeader};
-use caliptra_drivers::{CaliptraError, CaliptraResult};
+use caliptra_drivers::{CaliptraError, CaliptraResult, okref};
 use crypto::{AlgLen, Crypto};
 use dpe::{
     commands::{
@@ -130,6 +130,9 @@ impl InvokeDpeCmd {
                 Command::GetCertificateChain(cmd) => cmd.execute(dpe, &mut env, locality),
             };
 
+            let resp = okref(&resp);
+            // Need to return a `&Response` to use okref, so pre-allocate the error branch. 
+            let mut error_response = Response::Error(ResponseHdr::new(dpe::response::DpeErrorCode::NoError));
             // If DPE command failed, populate header with error code, but
             // don't fail the mailbox command.
             let resp_struct = match resp {
@@ -139,7 +142,8 @@ impl InvokeDpeCmd {
                     if let Some(ext_err) = e.get_error_detail() {
                         drivers.soc_ifc.set_fw_extended_error(ext_err);
                     }
-                    Response::Error(ResponseHdr::new(e))
+                    error_response = Response::Error(ResponseHdr::new(e));
+                    &error_response
                 }
             };
 
