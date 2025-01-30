@@ -14,8 +14,8 @@ Abstract:
 
 use core::cmp::min;
 
-use arrayvec::ArrayVec;
 use caliptra_drivers::cprintln;
+use caliptra_error::CaliptraError;
 use caliptra_image_types::{ImageHeader, ImageManifest};
 use caliptra_x509::{NotAfter, NotBefore};
 use crypto::Digest;
@@ -26,7 +26,7 @@ use dpe::{
 use platform::{
     CertValidity, OtherName, Platform, PlatformError, SignerIdentifier, SubjectAltName, Ueid,
     MAX_CHUNK_SIZE, MAX_ISSUER_NAME_SIZE, MAX_KEY_IDENTIFIER_SIZE, MAX_OTHER_NAME_SIZE,
-    MAX_SN_SIZE,
+    MAX_SN_SIZE, MAX_VALIDITY_SIZE,
 };
 use zerocopy::IntoBytes;
 
@@ -35,7 +35,7 @@ use crate::{subject_alt_name::AddSubjectAltNameCmd, MAX_CERT_CHAIN_SIZE};
 pub struct DpePlatform<'a> {
     auto_init_locality: u32,
     hashed_rt_pub_key: &'a Digest,
-    cert_chain: &'a ArrayVec<u8, MAX_CERT_CHAIN_SIZE>,
+    cert_chain: &'a [u8; MAX_CERT_CHAIN_SIZE],
     not_before: &'a NotBefore,
     not_after: &'a NotAfter,
     dmtf_device_info: Option<&'a [u8]>,
@@ -49,7 +49,7 @@ impl<'a> DpePlatform<'a> {
     pub fn new(
         auto_init_locality: u32,
         hashed_rt_pub_key: &'a Digest,
-        cert_chain: &'a ArrayVec<u8, 4096>,
+        cert_chain: &'a [u8; MAX_CERT_CHAIN_SIZE],
         not_before: &'a NotBefore,
         not_after: &'a NotAfter,
         dmtf_device_info: Option<&'a [u8]>,
@@ -139,11 +139,7 @@ impl Platform for DpePlatform<'_> {
             return Err(PlatformError::SubjectKeyIdentifierError(0));
         }
         ski.copy_from_slice(&hashed_rt_pub_key[..MAX_KEY_IDENTIFIER_SIZE]);
-        let mut ski_vec = ArrayVec::new();
-        ski_vec
-            .try_extend_from_slice(&ski)
-            .map_err(|_| PlatformError::SubjectKeyIdentifierError(0))?;
-        Ok(SignerIdentifier::SubjectKeyIdentifier(ski_vec))
+        Ok(SignerIdentifier::SubjectKeyIdentifier(ski))
     }
 
     fn get_issuer_key_identifier(
@@ -164,14 +160,10 @@ impl Platform for DpePlatform<'_> {
     }
 
     fn get_cert_validity(&mut self) -> Result<CertValidity, PlatformError> {
-        let mut not_before = ArrayVec::new();
-        not_before
-            .try_extend_from_slice(&self.not_before.value)
-            .map_err(|_| PlatformError::CertValidityError(0))?;
-        let mut not_after = ArrayVec::new();
-        not_after
-            .try_extend_from_slice(&self.not_after.value)
-            .map_err(|_| PlatformError::CertValidityError(0))?;
+        let mut not_before = [0; MAX_VALIDITY_SIZE];
+        not_before[..self.not_before.value.len()].copy_from_slice(&self.not_before.value[..self.not_before.value.len()]);
+        let mut not_after = [0; MAX_VALIDITY_SIZE];
+        not_after[..self.not_after.value.len()].copy_from_slice(&self.not_after.value[..self.not_after.value.len()]);
         Ok(CertValidity {
             not_before,
             not_after,
@@ -182,10 +174,12 @@ impl Platform for DpePlatform<'_> {
         match &self.dmtf_device_info {
             None => Err(PlatformError::NotImplemented),
             Some(dmtf_device_info) => {
-                let mut other_name = ArrayVec::new();
-                other_name
-                    .try_extend_from_slice(dmtf_device_info)
-                    .map_err(|_| PlatformError::SubjectAlternativeNameError(0))?;
+                let mut other_name = [0; MAX_OTHER_NAME_SIZE];
+                if other_name.len() >= dmtf_device_info.len() {
+                    other_name[..dmtf_device_info.len()].copy_from_slice(&dmtf_device_info[..dmtf_device_info.len()]);
+                } else {
+                    Err(PlatformError::SubjectKeyIdentifierError(0))?;
+                }
 
                 Ok(SubjectAltName::OtherName(OtherName {
                     oid: AddSubjectAltNameCmd::DMTF_OID,

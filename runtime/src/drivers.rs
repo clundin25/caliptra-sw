@@ -24,7 +24,6 @@ use crate::{
 };
 
 use crate::dpe_crypto::{ExportedCdiHandles, EXPORTED_HANDLES_NUM};
-use arrayvec::ArrayVec;
 use caliptra_cfi_derive_git::{cfi_impl_fn, cfi_mod_fn};
 use caliptra_cfi_lib_git::{cfi_assert, cfi_assert_eq, cfi_assert_eq_12_words, cfi_launder};
 use caliptra_common::mailbox_api::AddSubjectAltNameReq;
@@ -101,14 +100,14 @@ pub struct Drivers {
 
     pub pic: Pic,
 
-    pub cert_chain: ArrayVec<u8, MAX_CERT_CHAIN_SIZE>,
+    pub cert_chain: [u8; MAX_CERT_CHAIN_SIZE],
 
     #[cfg(feature = "fips_self_test")]
     pub self_test_status: SelfTestStatus,
 
     pub is_shutdown: bool,
 
-    pub dmtf_device_info: Option<ArrayVec<u8, { AddSubjectAltNameReq::MAX_DEVICE_INFO_LEN }>>,
+    pub dmtf_device_info: Option<[u8; AddSubjectAltNameReq::MAX_DEVICE_INFO_LEN]>,
     pub exported_cdi_slots: ExportedCdiHandles,
 }
 
@@ -145,7 +144,7 @@ impl Drivers {
             pic: Pic::new(El2PicCtrl::new()),
             #[cfg(feature = "fips_self_test")]
             self_test_status: SelfTestStatus::Idle,
-            cert_chain: ArrayVec::new(),
+            cert_chain: [0; MAX_CERT_CHAIN_SIZE],
             is_shutdown: false,
             dmtf_device_info: None,
             exported_cdi_slots: [None; EXPORTED_HANDLES_NUM],
@@ -519,19 +518,7 @@ impl Drivers {
             return Err(CaliptraError::RUNTIME_RT_ALIAS_CERT_TOO_BIG);
         }
 
-        // Copy cert chain to ArrayVec.
-        let mut cert_chain = ArrayVec::<u8, MAX_CERT_CHAIN_SIZE>::new();
-        for i in 0..cert_chain_size {
-            cert_chain
-                .try_push(
-                    *cert
-                        .get(i)
-                        .ok_or(CaliptraError::RUNTIME_CERT_CHAIN_CREATION_FAILED)?,
-                )
-                .map_err(|_| CaliptraError::RUNTIME_CERT_CHAIN_CREATION_FAILED)?;
-        }
-
-        drivers.cert_chain = cert_chain;
+        drivers.cert_chain = cert;
         Ok(())
     }
 

@@ -12,7 +12,6 @@ Abstract:
 
 --*/
 
-use arrayvec::ArrayVec;
 use caliptra_common::mailbox_api::{MailboxResp, PopulateIdevCertReq};
 use caliptra_error::{CaliptraError, CaliptraResult};
 use zerocopy::IntoBytes;
@@ -38,13 +37,16 @@ impl PopulateIDevIdCertCmd {
                 return Err(CaliptraError::RUNTIME_INCORRECT_PAUSER_PRIVILEGE_LEVEL);
             }
 
-            let mut tmp_chain = ArrayVec::<u8, MAX_CERT_CHAIN_SIZE>::new();
-            tmp_chain
-                .try_extend_from_slice(&cmd.cert[..cert_size])
-                .map_err(|_| CaliptraError::RUNTIME_IDEV_CERT_POPULATION_FAILED)?;
-            tmp_chain
-                .try_extend_from_slice(drivers.cert_chain.as_slice())
-                .map_err(|_| CaliptraError::RUNTIME_IDEV_CERT_POPULATION_FAILED)?;
+            let mut tmp_chain = [0; MAX_CERT_CHAIN_SIZE];
+            if MAX_CERT_CHAIN_SIZE < cert_size {
+                return Err(CaliptraError::RUNTIME_IDEV_CERT_POPULATION_FAILED);
+            }
+            tmp_chain[..cert_size].clone_from_slice(&cmd.cert[..cert_size]);
+            let bytes_written = cert_size;
+
+            //tmp_chain
+            //    .try_extend_from_slice(drivers.cert_chain.as_slice())
+            //    .map_err(|_| CaliptraError::RUNTIME_IDEV_CERT_POPULATION_FAILED)?;
             drivers.cert_chain = tmp_chain;
 
             Ok(MailboxResp::default())

@@ -14,7 +14,6 @@ Abstract:
 
 use core::str::from_utf8;
 
-use arrayvec::ArrayVec;
 use caliptra_common::mailbox_api::{AddSubjectAltNameReq, MailboxResp};
 use caliptra_error::{CaliptraError, CaliptraResult};
 use zerocopy::IntoBytes;
@@ -40,10 +39,9 @@ impl AddSubjectAltNameCmd {
 
             Self::validate_dmtf_device_info(&cmd.dmtf_device_info[..dmtf_device_info_size])?;
 
-            let mut dmtf_device_info = ArrayVec::new();
-            dmtf_device_info
-                .try_extend_from_slice(&cmd.dmtf_device_info[..dmtf_device_info_size])
-                .map_err(|_| CaliptraError::RUNTIME_STORE_DMTF_DEVICE_INFO_FAILED)?;
+            let mut dmtf_device_info = [0; AddSubjectAltNameReq::MAX_DEVICE_INFO_LEN];
+            dmtf_device_info[..dmtf_device_info_size]
+                .copy_from_slice(&cmd.dmtf_device_info[..dmtf_device_info_size]);
             drivers.dmtf_device_info = Some(dmtf_device_info);
 
             Ok(MailboxResp::default())
@@ -53,10 +51,8 @@ impl AddSubjectAltNameCmd {
     }
 
     fn validate_dmtf_device_info(dmtf_device_info: &[u8]) -> CaliptraResult<()> {
-        let dmtf_device_info_utf8 = from_utf8(dmtf_device_info)
-            .map_err(|_| CaliptraError::RUNTIME_DMTF_DEVICE_INFO_VALIDATION_FAILED)?;
         // dmtf_device_info_utf8 must match ^[^:]*:[^:]*:[^:]*$
-        if dmtf_device_info_utf8.chars().filter(|c| *c == ':').count() != 2 {
+        if dmtf_device_info.iter().filter(|&c| *c == b':').count() != 2 {
             Err(CaliptraError::RUNTIME_DMTF_DEVICE_INFO_VALIDATION_FAILED)
         } else {
             Ok(())
