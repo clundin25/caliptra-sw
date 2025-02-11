@@ -396,7 +396,7 @@ pub struct ImageTocEntry {
     pub id: u32,
 
     /// Type
-    pub r#type: u32,
+    pub image_type: u32,
 
     /// Commit revision
     pub revision: ImageRevision,
