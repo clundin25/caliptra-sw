@@ -8,122 +8,82 @@
 set -e
 set -x
 
-mkdir -p out
-SYSTEM_BOOT_SHA256="5a22eac02deb38825ed5df260e394753f440d546a34b9ed30ac096eb3aed2eb5"
-if ! (echo "${SYSTEM_BOOT_SHA256} out/system-boot.tar.gz" | sha256sum -c); then
-  curl -o out/system-boot.tar.gz https://people.canonical.com/~platform/images/xilinx/versal-ubuntu-22.04/iot-limerick-versal-classic-server-2204-x02-20230315-48-system-boot.tar.gz
-  if ! (echo "${SYSTEM_BOOT_SHA256} out/system-boot.tar.gz" | sha256sum -c); then
-    echo "Downloaded system-boot file did not match expected sha256sum".
+export OUT_DIR=out2
+
+mkdir -p ${OUT_DIR}
+SYSTEM_IMAGE="5a0f3d04034923c5f04371a656b7e948dcd9894b3ca4ad2fe8a1d52139124e6c"
+if ! (echo "${SYSTEM_IMAGE} ${OUT_DIR}/image.img.xz" | sha256sum -c); then
+  curl -o ${OUT_DIR}/image.img.xz -L "https://people.canonical.com/~platform/images/xilinx/versal-ubuntu-22.04/iot-limerick-versal-classic-server-2204-x02-20230315-48.img.xz"
+  if ! (echo "${SYSTEM_IMAGE} ${OUT_DIR}/image.img.xz" | sha256sum -c); then
+    echo "Downloaded image file did not match expected sha256sum".
     exit 1
   fi
 fi
 
-# Build the rootfs
-SYSROOT_SHA256="92673773dedab24cb6b6aebbf22df1263f9f31e10fcc20c27b4313de807a1448"
-if ! (echo "${SYSROOT_SHA256} out/sysroot.tar.xz" | sha256sum -c); then
-  curl -o out/sysroot.tar.xz -L "https://people.canonical.com/~platform/images/xilinx/versal-ubuntu-22.04//iot-limerick-versal-classic-server-2204-x02-20230315-48-sysroot.tar.xz"
-  if ! (echo "${SYSROOT_SHA256} out/sysroot.tar.xz" | sha256sum -c); then
-    echo "Downloaded sysroot file did not match expected sha256sum".
-    exit 1
-  fi
-fi
+scp ${OUT_DIR}/image.img.xz ${OUT_DIR}/work-image.img.xz
+(rm ${OUT_DIR}/work-image.img || true)
+(xz -d ${OUT_DIR}/work-image.img.xz || true)
 
-(rm -rf out/rootfs || true)
-tar -xvf out/sysroot.tar.xz -C out/
-(cd out/sysroots && ./build-sysroot.sh)
-mv sysroots/aarch64-xilinx-linux out/rootfs/
+LOOPBACK_DEV="$(losetup --show -Pf ${OUT_DIR}/work-image.img)"
 
-echo "runner ALL=(ALL) NOPASSWD:ALL" > out/rootfs/etc/sudoers.d/runner
-chroot out/rootfs useradd runner --shell /bin/bash --create-home
-chroot out/rootfs bash -c 'echo kernel.softlockup_panic = 1 >> /etc/sysctl.conf'
-chroot out/rootfs bash -c 'echo kernel.softlockup_all_cpu_backtrace = 1 >> /etc/sysctl.conf'
-chroot out/rootfs mkdir /mnt/root_base
-chroot out/rootfs mkdir /mnt/root_overlay
-chroot out/rootfs mkdir /mnt/new_root
-chroot out/rootfs bash -c 'echo kernel.panic_print = 127 >> /etc/sysctl.conf'
-chroot out/rootfs bash -c 'echo kernel.sysrq = 1 >> /etc/sysctl.conf'
-echo Retrieving latest GHA runner version
-RUNNER_VERSION="$(curl https://api.github.com/repos/actions/runner/releases/latest | jq -r '.tag_name[1:]')"
-echo Using runner version ${RUNNER_VERSION}
-trap - EXIT
-(cd out/rootfs/home/runner && curl -O -L "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-arm64-${RUNNER_VERSION}.tar.gz")
-chroot out/rootfs bash -c "su runner -c \"cd /home/runner && tar xvzf actions-runner-linux-arm64-${RUNNER_VERSION}.tar.gz && rm -f actions-runner-linux-arm64-${RUNNER_VERSION}.tar.gz\""
+(rm -r ${OUT_DIR}/bootfs || true)
+mkdir -p ${OUT_DIR}/bootfs
 
-su $SUDO_USER -c "
-CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=\"aarch64-linux-gnu-gcc\" \
-CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS=\"-C link-arg=--sysroot=$PWD/out/rootfs\" \
-~/.cargo/bin/cargo install cargo-nextest@0.9.64 \
---locked \
---no-default-features \
---features=default-no-update \
---target=aarch64-unknown-linux-gnu \
---root /tmp/cargo-nextest"
+mount "${LOOPBACK_DEV}p1" ${OUT_DIR}/bootfs
 
-cp /tmp/cargo-nextest/bin/cargo-nextest out/rootfs/usr/bin/
-
-cp startup-script.sh out/rootfs/usr/bin/
-chroot out/rootfs chmod 755 /usr/bin/startup-script.sh
-cp startup-script.service out/rootfs/etc/systemd/system/
-chroot out/rootfs systemctl enable startup-script.service
-
-# Build a squashed filesystem from the rootfs
-rm out/rootfs.sqsh || true
-sudo mksquashfs out/rootfs out/rootfs.sqsh -comp zstd
-bootfs_blocks="$((125000 * 2))"
-rootfs_bytes="$(stat --printf="%s" out/rootfs.sqsh)"
-rootfs_blocks="$((($rootfs_bytes + 512) / 512))"
-persistfs_blocks=14680064
-
-# Allocate the disk image
-fallocate -l $(((2048 + 8 + $bootfs_blocks + $rootfs_blocks + $persistfs_blocks) * 512)) out/image.img
-
-# Partition the disk image
-cat <<EOF | sfdisk out/image.img
-label: dos
-label-id: 0x4effe30a
-device: image.img
-unit: sectors
-sector-size: 512
-
-p1 : start=2048, size=${bootfs_blocks}, type=c, bootable
-p2 : start=$((2048 + $bootfs_blocks)), size=8, type=83
-p3 : start=$((2048 + 8 + $bootfs_blocks)), size=${rootfs_blocks}, type=83
-p4 : start=$((2048 + 8 + $bootfs_blocks + $rootfs_blocks)), size=${persistfs_blocks}, type=83
-EOF
-truncate -s $(((2048 + 8 + $bootfs_blocks + $rootfs_blocks) * 512)) out/image.img
-
-
-LOOPBACK_DEV="$(losetup --show -Pf out/image.img)"
 function cleanup1 {
+  umount ${OUT_DIR}/bootfs
   losetup -d ${LOOPBACK_DEV}
 }
 trap cleanup1 EXIT
 
-# Format bootfs partition (kernel + bootloader stages)
-mkfs -t vfat "${LOOPBACK_DEV}p1"
+cp /usr/local/google/home/clundin/boot1900.bin ${OUT_DIR}/bootfs/boot1900.bin
+umount ${OUT_DIR}/bootfs
 
-# Mount bootfs partition (from image) for modification
-mkdir -p out/bootfs
-mount "${LOOPBACK_DEV}p1" out/bootfs
+(rm -r ${OUT_DIR}/rootfs || true)
+mkdir -p ${OUT_DIR}/rootfs
+mount "${LOOPBACK_DEV}p2" ${OUT_DIR}/rootfs
 
 function cleanup2 {
-  umount out/bootfs
-  cleanup1
+  umount ${OUT_DIR}/rootfs
+  losetup -d ${LOOPBACK_DEV}
 }
 trap cleanup2 EXIT
 
-# Write bootfs contents
-tar xvzf out/system-boot.tar.gz -C out/bootfs
+mkdir -p ${OUT_DIR}/rootfs/etc/sudoers.d/
+echo "runner ALL=(ALL) NOPASSWD:ALL" > ${OUT_DIR}/rootfs/etc/sudoers.d/runner
+ls ${OUT_DIR}/rootfs
+chroot ${OUT_DIR}/rootfs useradd runner --shell /bin/bash --create-home
+chroot ${OUT_DIR}/rootfs bash -c 'echo kernel.softlockup_panic = 1 >> /etc/sysctl.conf'
+chroot ${OUT_DIR}/rootfs bash -c 'echo kernel.softlockup_all_cpu_backtrace = 1 >> /etc/sysctl.conf'
+chroot ${OUT_DIR}/rootfs bash -c 'echo kernel.panic_print = 127 >> /etc/sysctl.conf'
+chroot ${OUT_DIR}/rootfs bash -c 'echo kernel.sysrq = 1 >> /etc/sysctl.conf'
 
-# Replace the u-boot boot script with our own
-rm out/bootfs/boot.scr.uimg
-mkimage -T script -n "boot script" -C none -d boot.scr out/bootfs/boot.scr.uimg
-cp /usr/local/google/home/clundin/boot1900.bin out/bootfs/boot1900.bin
-umount out/bootfs
-trap cleanup1 EXIT
+echo Retrieving latest GHA runner version
+RUNNER_VERSION="$(curl https://api.github.com/repos/actions/runner/releases/latest | jq -r '.tag_name[1:]')"
+echo Using runner version ${RUNNER_VERSION}
+trap - EXIT
+(cd ${OUT_DIR}/rootfs/home/runner && curl -O -L "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-arm64-${RUNNER_VERSION}.tar.gz")
+chroot ${OUT_DIR}/rootfs bash -c "su runner -c \"cd /home/runner && tar xvzf actions-runner-linux-arm64-${RUNNER_VERSION}.tar.gz && rm -f actions-runner-linux-arm64-${RUNNER_VERSION}.tar.gz\""
 
-# Write the rootfs squashed filesystem to the image partition
-dd if=out/rootfs.sqsh of="${LOOPBACK_DEV}p3"
+#su $SUDO_USER -c "
+#CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=\"aarch64-linux-gnu-gcc\" \
+#CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS=\"-C link-arg=--sysroot=$PWD/${OUT_DIR}/rootfs\" \
+#~/.cargo/bin/cargo install cargo-nextest@0.9.64 \
+#--locked \
+#--no-default-features \
+#--features=default-no-update \
+#--target=aarch64-unknown-linux-gnu \
+#--root /tmp/cargo-nextest"
+#
+#cp /tmp/cargo-nextest/bin/cargo-nextest ${OUT_DIR}/rootfs/usr/bin/
 
-# Write a sentinel value to the configuration partition
-echo CONFIG_PARTITION > "${LOOPBACK_DEV}p2"
+cp startup-script.sh ${OUT_DIR}/rootfs/usr/bin/
+chroot ${OUT_DIR}/rootfs chmod 755 /usr/bin/startup-script.sh
+cp startup-script.service ${OUT_DIR}/rootfs/etc/systemd/system/
+chroot ${OUT_DIR}/rootfs systemctl enable startup-script.service
+
+umount ${OUT_DIR}/rootfs
+losetup -d ${LOOPBACK_DEV}
+
+xz ${OUT_DIR}/work-image.img
