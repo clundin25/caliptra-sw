@@ -4,6 +4,6 @@
 
 cd /home/runner
 su runner -l -c "export"
-su runner -l -c "/home/runner/actions-runner/run.sh --jitconfig '${JITCONFIG}' --labels fgpa-tools"
+su runner -l -c "/home/runner/actions-runner/run.sh --jitconfig '${JITCONFIG}'"
 
 shutdown -h now
