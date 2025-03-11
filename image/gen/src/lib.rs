@@ -106,6 +106,8 @@ pub struct ImageGeneratorVendorConfig {
     pub not_after: [u8; 15],
 
     pub pl0_pauser: Option<u32>,
+
+    pub mark_dice_extensions_critical: Option<bool>,
 }
 
 /// Image Generator Owner Configuration

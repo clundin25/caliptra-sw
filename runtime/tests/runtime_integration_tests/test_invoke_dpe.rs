@@ -1,10 +1,11 @@
 // Licensed under the Apache-2.0 license.
 
 use crate::common::{
-    execute_dpe_cmd, get_rt_alias_cert, run_rt_test, DpeResult, RuntimeTestArgs, TEST_DIGEST,
-    TEST_LABEL,
+    execute_dpe_cmd, get_rt_alias_cert, run_rt_test, DpeResult, RuntimeTestArgs,
+    DEFAULT_APP_VERSION, DEFAULT_FMC_VERSION, TEST_DIGEST, TEST_LABEL,
 };
 use caliptra_api::SocManager;
+use caliptra_builder::ImageOptions;
 use caliptra_common::mailbox_api::{InvokeDpeReq, MailboxReq, MailboxReqHeader};
 use caliptra_drivers::CaliptraError;
 use caliptra_hw_model::HwModel;
@@ -16,8 +17,8 @@ use cms::{
 };
 use dpe::{
     commands::{
-        CertifyKeyCmd, CertifyKeyFlags, Command, GetCertificateChainCmd, InitCtxCmd, RotateCtxCmd,
-        RotateCtxFlags, SignCmd, SignFlags,
+        CertifyKeyCmd, CertifyKeyFlags, Command, DeriveContextCmd, DeriveContextFlags,
+        GetCertificateChainCmd, InitCtxCmd, RotateCtxCmd, RotateCtxFlags, SignCmd, SignFlags,
     },
     context::ContextHandle,
     response::{DpeErrorCode, Response},
@@ -31,6 +32,7 @@ use openssl::{
     x509::X509,
 };
 use sha2::{Digest, Sha384};
+use x509_parser::{nom::Parser, prelude::*};
 
 #[test]
 fn test_invoke_dpe_get_profile_cmd() {
@@ -296,4 +298,99 @@ fn test_invoke_dpe_rotate_context() {
     };
 
     assert!(rotate_ctx_resp.handle.is_default());
+}
+
+fn check_dice_extension_criticality(cert: &[u8], expected_criticality: bool) {
+    let mut parser = X509CertificateParser::new().with_deep_parse_extensions(true);
+    let Ok((_, cert)) = parser
+            .parse(cert) else {
+                panic!("Could not parse x509 certificate from CertifyKey!");
+            };
+    for extension in cert.iter_extensions() {
+        // Unknown extensions are DICE extensions, and they should match the
+        // criticality set by the DPE instance.
+        if extension.parsed_extension().unsupported() {
+            assert_eq!(extension.critical, expected_criticality);
+        }
+    }
+}
+
+#[test]
+fn test_invoke_dpe_certify_key_with_critical_dice_extensions() {
+    for mark_dice_extensions_critical in [true, false] {
+        let mut test_image_options = ImageOptions::default();
+        test_image_options
+            .vendor_config
+            .mark_dice_extensions_critical = Some(mark_dice_extensions_critical);
+        test_image_options.fmc_version = DEFAULT_FMC_VERSION;
+        test_image_options.app_version = DEFAULT_APP_VERSION;
+        let test_image_options = Some(test_image_options);
+
+        let mut model = run_rt_test(RuntimeTestArgs {
+            test_image_options,
+            ..Default::default()
+        });
+
+        let certify_key_cmd = CertifyKeyCmd {
+            handle: ContextHandle::default(),
+            label: TEST_LABEL,
+            flags: CertifyKeyFlags::empty(),
+            format: CertifyKeyCmd::FORMAT_X509,
+        };
+        let resp = execute_dpe_cmd(
+            &mut model,
+            &mut Command::CertifyKey(&certify_key_cmd),
+            DpeResult::Success,
+        );
+        let Some(Response::CertifyKey(resp)) = resp else {
+            panic!("Wrong response type!");
+        };
+        check_dice_extension_criticality(
+            &resp.cert[..resp.cert_size.try_into().unwrap()],
+            mark_dice_extensions_critical,
+        );
+    }
+}
+
+#[test]
+fn test_invoke_dpe_export_cdi_with_critical_dice_extensions() {
+    for mark_dice_extensions_critical in [true, false] {
+        let mut test_image_options = ImageOptions::default();
+        test_image_options
+            .vendor_config
+            .mark_dice_extensions_critical = Some(mark_dice_extensions_critical);
+        test_image_options.fmc_version = DEFAULT_FMC_VERSION;
+        test_image_options.app_version = DEFAULT_APP_VERSION;
+        let test_image_options = Some(test_image_options);
+
+        let mut model = run_rt_test(RuntimeTestArgs {
+            test_image_options,
+            ..Default::default()
+        });
+
+        model.step_until(|m| {
+            m.soc_ifc().cptra_boot_status().read() == u32::from(RtBootStatus::RtReadyForCommands)
+        });
+
+        let derive_ctx_cmd = DeriveContextCmd {
+            handle: ContextHandle::default(),
+            data: [0; DPE_PROFILE.get_tci_size()],
+            flags: DeriveContextFlags::EXPORT_CDI | DeriveContextFlags::CREATE_CERTIFICATE,
+            tci_type: 0,
+            target_locality: 0,
+        };
+        let resp = execute_dpe_cmd(
+            &mut model,
+            &mut Command::DeriveContext(&derive_ctx_cmd),
+            DpeResult::Success,
+        );
+
+        let Some(Response::DeriveContextExportedCdi(resp)) = resp else {
+            panic!("expected derive context resp!");
+        };
+        check_dice_extension_criticality(
+            &resp.new_certificate[..resp.certificate_size.try_into().unwrap()],
+            mark_dice_extensions_critical,
+        );
+    }
 }

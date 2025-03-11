@@ -47,6 +47,7 @@ use caliptra_registers::{
 };
 use caliptra_x509::{NotAfter, NotBefore};
 use dpe::context::{Context, ContextState, ContextType};
+use dpe::dpe_instance::DpeInstanceFlags;
 use dpe::tci::TciMeasurement;
 use dpe::validation::DpeValidator;
 use dpe::MAX_HANDLES;
@@ -378,6 +379,7 @@ impl Drivers {
         let mut valid_pauser_hash = Array4x12::default();
         digest_op.finalize(&mut valid_pauser_hash)?;
 
+        let image_header_flags = drivers.persistent_data.get().manifest1.header.flags;
         let key_id_rt_cdi = Drivers::get_key_id_rt_cdi(drivers)?;
         let key_id_rt_priv_key = Drivers::get_key_id_rt_priv_key(drivers)?;
         let pdata = drivers.persistent_data.get_mut();
@@ -411,11 +413,23 @@ impl Drivers {
         let rt_journey_measurement = <[u8; DPE_PROFILE.get_hash_size()]>::from(
             &drivers.pcr_bank.read_pcr(RT_FW_JOURNEY_PCR),
         );
-        let mut dpe = DpeInstance::new_auto_init(
+        let flags = {
+            let dice_extension_critical_mask: u32 = 0x0002;
+            let mark_dice_extensions_critical =
+                (image_header_flags & dice_extension_critical_mask) == dice_extension_critical_mask;
+            let mut flags = DpeInstanceFlags::empty();
+            flags.set(
+                DpeInstanceFlags::MARK_DICE_EXTENSIONS_CRITICAL,
+                mark_dice_extensions_critical,
+            );
+            flags
+        };
+        let mut dpe = DpeInstance::with_flags_auto_init(
             &mut env,
             DPE_SUPPORT,
             u32::from_be_bytes(*b"RTJM"),
             rt_journey_measurement,
+            flags,
         )
         .map_err(|_| CaliptraError::RUNTIME_INITIALIZE_DPE_FAILED)?;
 

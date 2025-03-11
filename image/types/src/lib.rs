@@ -339,6 +339,8 @@ pub struct ImageHeader {
 
     /// Flags
     /// Bit 0: Interpret the pl0_pauser field. If not set, all PAUSERs are PL1.
+    /// Bit 1: Configure TCG DICE x509 Extension Criticality. If set, all DPE certificates will
+    /// mark TCG DICE extensions as critical.
     pub flags: u32,
 
     /// TOC Entry Count
