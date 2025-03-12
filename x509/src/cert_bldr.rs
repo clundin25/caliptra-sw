@@ -170,6 +170,8 @@ pub struct Ecdsa384CertBuilder<'a> {
 
     /// Length of the signed Cert/CSR
     len: usize,
+    // Mark DICE Extensions as critical
+    //mark_dice_extensions_critical: bool,
 }
 
 impl<'a> Ecdsa384CertBuilder<'a> {

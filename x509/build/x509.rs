@@ -263,7 +263,8 @@ pub fn make_tcg_ueid_ext(ueid: &[u8]) -> X509Extension {
     let der = asn1::write_single(&tcg_ueid).unwrap();
     let der = Asn1OctetString::new_from_bytes(&der).unwrap();
     let oid = Asn1Object::from_str(TCG_UEID_OID).unwrap();
-    X509Extension::new_from_der(&oid, false, &der).unwrap()
+    let extension = X509Extension::new_from_der(&oid, false, &der).unwrap();
+    extension
 }
 
 /// Make Subject Key ID extension

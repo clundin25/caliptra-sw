@@ -16,6 +16,7 @@ use caliptra_common::mailbox_api::{
     GetFmcAliasCertResp, GetIdevCertReq, GetIdevCertResp, GetLdevCertResp, GetRtAliasCertResp,
     MailboxResp, MailboxRespHeader,
 };
+use memoffset::span_of;
 
 use crate::Drivers;
 
@@ -23,7 +24,7 @@ use caliptra_drivers::{
     hand_off::DataStore, CaliptraError, CaliptraResult, DataVault, Ecc384Scalar, Ecc384Signature,
     PersistentData,
 };
-use caliptra_x509::{Ecdsa384CertBuilder, Ecdsa384Signature};
+use caliptra_x509::{Ecdsa384CertBuilder, Ecdsa384Signature, RtAliasCertTbs};
 use zerocopy::IntoBytes;
 
 pub struct IDevIdCertCmd;
@@ -327,8 +328,12 @@ pub fn copy_rt_alias_cert(
 ) -> CaliptraResult<usize> {
     let tbs = persistent_data
         .rtalias_tbs
-        .get(..persistent_data.fht.rtalias_tbs_size.into());
-    cert_from_tbs_and_sig(tbs, &persistent_data.fht.rt_dice_sign, cert)
+        .get(..persistent_data.fht.rtalias_tbs_size.into())
+        .ok_or(CaliptraError::RUNTIME_GET_RT_ALIAS_CERT_FAILED)?;
+    let ueid = tbs
+        .get(RtAliasCertTbs::UEID_OFFSET..RtAliasCertTbs::UEID_OFFSET + RtAliasCertTbs::UEID_LEN)
+        .ok_or(CaliptraError::RUNTIME_GET_RT_ALIAS_CERT_FAILED)?;
+    cert_from_tbs_and_sig(Some(tbs), &persistent_data.fht.rt_dice_sign, cert)
         .map_err(|_| CaliptraError::RUNTIME_GET_RT_ALIAS_CERT_FAILED)
 }
 

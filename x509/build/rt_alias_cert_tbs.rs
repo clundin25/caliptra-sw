@@ -44,7 +44,7 @@ impl RtAliasCertTbs {
     const SERIAL_NUMBER_OFFSET: usize = 11usize;
     const SUBJECT_KEY_ID_OFFSET: usize = 596usize;
     const AUTHORITY_KEY_ID_OFFSET: usize = 629usize;
-    const UEID_OFFSET: usize = 476usize;
+    pub const UEID_OFFSET: usize = 476usize;
     const NOT_BEFORE_OFFSET: usize = 157usize;
     const NOT_AFTER_OFFSET: usize = 174usize;
     const TCB_INFO_RT_SVN_OFFSET: usize = 510usize;
@@ -55,7 +55,7 @@ impl RtAliasCertTbs {
     const SERIAL_NUMBER_LEN: usize = 20usize;
     const SUBJECT_KEY_ID_LEN: usize = 20usize;
     const AUTHORITY_KEY_ID_LEN: usize = 20usize;
-    const UEID_LEN: usize = 17usize;
+    pub const UEID_LEN: usize = 17usize;
     const NOT_BEFORE_LEN: usize = 15usize;
     const NOT_AFTER_LEN: usize = 15usize;
     const TCB_INFO_RT_SVN_LEN: usize = 1usize;
