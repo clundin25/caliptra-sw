@@ -16,9 +16,10 @@ Abstract:
 use caliptra_cfi_derive::Launder;
 use caliptra_error::{CaliptraError, CaliptraResult};
 use caliptra_registers::soc_ifc::enums::DeviceLifecycleE;
+use caliptra_registers::soc_ifc::regs::CptraFlowStatusWriteVal;
 use caliptra_registers::soc_ifc::{self, SocIfcReg};
 
-use crate::{memory_layout, FuseBank};
+use crate::{cprintln, memory_layout, FuseBank};
 
 pub type Lifecycle = DeviceLifecycleE;
 
@@ -149,9 +150,13 @@ impl SocIfc {
     /// * None
     pub fn flow_status_set_mailbox_flow_done(&mut self, state: bool) {
         let soc_ifc = self.soc_ifc.regs_mut();
-        soc_ifc
-            .cptra_flow_status()
-            .write(|w| w.mailbox_flow_done(state));
+        let before_state = u32::from(soc_ifc.cptra_flow_status().read());
+        cprintln!("before: {:?}", before_state);
+        soc_ifc.cptra_flow_status().write(|_| {
+            CptraFlowStatusWriteVal::from((before_state & !(1 << 31)) | (u32::from(state) << 31))
+        });
+        let after_state = u32::from(soc_ifc.cptra_flow_status().read());
+        cprintln!("after: {:?}", after_state);
     }
 
     /// Get 'mailbox flow done' status
@@ -318,10 +323,11 @@ impl SocIfc {
     }
 
     pub fn assert_ready_for_runtime(&mut self) {
-        self.soc_ifc
-            .regs_mut()
-            .cptra_flow_status()
-            .write(|w| w.ready_for_runtime(true));
+        let soc_ifc = self.soc_ifc.regs_mut();
+        let before_state = u32::from(soc_ifc.cptra_flow_status().read());
+        soc_ifc.cptra_flow_status().write(|w| {
+            CptraFlowStatusWriteVal::from((before_state & !(1u32 << 29)) | (1u32 << 29))
+        });
     }
 
     pub fn set_rom_fw_rev_id(&mut self, rom_version: u16) {

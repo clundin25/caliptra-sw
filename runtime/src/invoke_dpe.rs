@@ -140,9 +140,9 @@ impl InvokeDpeCmd {
                     Self::clear_tags_for_inactive_contexts(dpe, context_has_tag, context_tags);
                     destroy_ctx_resp
                 }
-                Command::Sign(cmd) => cmd.execute(dpe, &mut env, locality),
                 Command::RotateCtx(cmd) => cmd.execute(dpe, &mut env, locality),
                 Command::GetCertificateChain(cmd) => cmd.execute(dpe, &mut env, locality),
+                _ => return Err(CaliptraError::RUNTIME_COULD_NOT_GET_DPE_PROFILE),
             };
 
             // If DPE command failed, populate header with error code, but
