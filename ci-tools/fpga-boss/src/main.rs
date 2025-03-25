@@ -159,7 +159,10 @@ fn log_uart_until<R: BufRead>(lines: &mut Lines<R>, needle: &str) -> std::io::Re
                 if line.contains(needle) {
                     return Ok(());
                 }
-            }
+            },
+            Err(e) if e.kind() == ErrorKind::TimedOut => {
+                return Err(e);
+            },
             Err(e) => {
                 println!("UART error: {}", e);
             }
