@@ -324,8 +324,8 @@ impl SocIfc {
 
     pub fn assert_ready_for_runtime(&mut self) {
         let soc_ifc = self.soc_ifc.regs_mut();
+        let before_state = u32::from(soc_ifc.cptra_flow_status().read());
         soc_ifc.cptra_flow_status().write(|_| {
-            let before_state = u32::from(soc_ifc.cptra_flow_status().read());
             CptraFlowStatusWriteVal::from((before_state & !(1u32 << 29)) | (1u32 << 29))
         });
     }
