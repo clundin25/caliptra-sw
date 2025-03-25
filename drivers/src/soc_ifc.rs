@@ -150,13 +150,9 @@ impl SocIfc {
     /// * None
     pub fn flow_status_set_mailbox_flow_done(&mut self, state: bool) {
         let soc_ifc = self.soc_ifc.regs_mut();
-        let before_state = u32::from(soc_ifc.cptra_flow_status().read());
-        //cprintln!("before: {:?}", before_state);
         soc_ifc.cptra_flow_status().write(|_| {
-            CptraFlowStatusWriteVal::from((before_state & !(1 << 31)) | (u32::from(state) << 31))
+            CptraFlowStatusWriteVal::from(u32::from(soc_ifc.cptra_flow_status().read())).mailbox_flow_done(state)
         });
-        let after_state = u32::from(soc_ifc.cptra_flow_status().read());
-        //cprintln!("after: {:?}", after_state);
     }
 
     /// Get 'mailbox flow done' status
@@ -324,9 +320,8 @@ impl SocIfc {
 
     pub fn assert_ready_for_runtime(&mut self) {
         let soc_ifc = self.soc_ifc.regs_mut();
-        let before_state = u32::from(soc_ifc.cptra_flow_status().read());
         soc_ifc.cptra_flow_status().write(|_| {
-            CptraFlowStatusWriteVal::from((before_state & !(1u32 << 29)) | (1u32 << 29))
+            CptraFlowStatusWriteVal::from(u32::from(soc_ifc.cptra_flow_status().read())).ready_for_runtime(true)
         });
     }
 
