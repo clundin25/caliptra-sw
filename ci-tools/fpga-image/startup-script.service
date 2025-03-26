@@ -1,8 +1,7 @@
 
 [Unit]
-After=serial-getty.target
-After=network-online.target
-Wants=network-online.target
+After=cloud-init.target
+Wants=cloud-init.target
 Conflicts=serial-getty@ttyAMA0.service
 
 [Service]
@@ -17,4 +16,4 @@ WorkingDirectory=/home/runner
 ExecStart=/usr/bin/startup-script.sh
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=cloud-init.target

@@ -41,9 +41,9 @@ trap cleanup2 EXIT
 # TODO: Get bitstream from GH actions
 (rm out/boot1900.zip || true)
 (rm out/boot1900.bin || true)
-curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/boot1900.zip" -o out/boot1900.zip
+curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/boot.zip" -o out/boot1900.zip
 unzip out/boot1900.zip -d out/
-cp out/boot1900.bin out/bootfs/boot1900.bin
+cp out/BOOT.BIN out/bootfs/boot1900.bin
 
 umount out/bootfs
 trap cleanup1 EXIT
@@ -58,7 +58,6 @@ function cleanup3 {
 }
 trap cleanup3 EXIT
 
-touch out/rootfs/etc/cloud/cloud-init.disabled
 mkdir -p out/rootfs/etc/sudoers.d/
 echo "runner ALL=(ALL) NOPASSWD:ALL" > out/rootfs/etc/sudoers.d/runner
 chroot out/rootfs useradd runner --shell /bin/bash --create-home
@@ -90,9 +89,6 @@ cp startup-script.sh out/rootfs/usr/bin/
 chroot out/rootfs chmod 755 /usr/bin/startup-script.sh
 cp startup-script.service out/rootfs/etc/systemd/system/
 chroot out/rootfs systemctl enable startup-script.service
-
-# We want to boot into the startup-script, not cloud-init.
-chroot out/rootfs systemctl disable cloud-init.service
 
 umount out/rootfs
 losetup -d ${LOOPBACK_DEV}
