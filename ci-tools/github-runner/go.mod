@@ -1,6 +1,6 @@
 module caliptra.org/github-runner
 
-go 1.19
+go 1.23.0
 
 require github.com/GoogleCloudPlatform/functions-framework-go v1.8.0
 
@@ -10,10 +10,9 @@ require cloud.google.com/go/pubsub v1.34.0
 
 require google.golang.org/protobuf v1.32.0
 
-require github.com/google/go-github/v53 v53.2.0
-
 require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.9.0
+	github.com/google/go-github/v70 v70.0.0
 	google.golang.org/api v0.157.0
 )
 
@@ -21,16 +20,13 @@ require (
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/functions v1.15.4 // indirect
 	cloud.google.com/go/iam v1.1.5 // indirect
-	github.com/ProtonMail/go-crypto v1.0.0 // indirect
 	github.com/cloudevents/sdk-go/v2 v2.15.0 // indirect
-	github.com/cloudflare/circl v1.3.7 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/go-github/v57 v57.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/s2a-go v0.1.7 // indirect

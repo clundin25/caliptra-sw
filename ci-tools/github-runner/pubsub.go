@@ -9,7 +9,7 @@ import (
 
 	pubsub "cloud.google.com/go/pubsub/apiv1"
 	"cloud.google.com/go/pubsub/apiv1/pubsubpb"
-	"github.com/google/go-github/v53/github"
+	"github.com/google/go-github/v70/github"
 )
 
 func PublishJitConfig(ctx context.Context, client *github.Client, labels []string) error {

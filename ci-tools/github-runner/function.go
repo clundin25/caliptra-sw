@@ -15,7 +15,7 @@ import (
 	compute "cloud.google.com/go/compute/apiv1"
 	"cloud.google.com/go/compute/apiv1/computepb"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
-	"github.com/google/go-github/v53/github"
+	"github.com/google/go-github/v70/github"
 	"google.golang.org/protobuf/proto"
 )
 
