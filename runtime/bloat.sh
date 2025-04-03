@@ -12,6 +12,5 @@ cargo bloat \
   --features=emu,fips_self_test,riscv \
   -p caliptra-runtime \
   -n 200 \
-  # Uncomment this line to see code size by crate
-  #--crates \
+  --crates \
   --bin=caliptra-runtime

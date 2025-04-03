@@ -12,7 +12,7 @@ use dpe::{
     commands::{Command, DeriveContextCmd, DeriveContextFlags},
     context::ContextHandle,
     response::{DeriveContextExportedCdiResp, DpeErrorCode, Response},
-    DPE_PROFILE,
+    DpeProfile, DPE_PROFILE,
 };
 use openssl::{
     bn::BigNum,
@@ -198,7 +198,8 @@ fn test_sign_with_exported_cdi_measurement_update_duplicate_cdi() {
         data: [0; DPE_PROFILE.get_tci_size()],
         flags: DeriveContextFlags::EXPORT_CDI
             | DeriveContextFlags::CREATE_CERTIFICATE
-            | DeriveContextFlags::RETAIN_PARENT_CONTEXT,
+            | DeriveContextFlags::RETAIN_PARENT_CONTEXT
+            | DeriveContextFlags::ALLOW_NEW_CONTEXT_TO_EXPORT,
         tci_type: 0,
         target_locality: 0,
     };

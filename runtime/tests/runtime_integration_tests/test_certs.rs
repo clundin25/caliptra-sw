@@ -1041,9 +1041,7 @@ pub fn test_all_measurement_apis() {
         let derive_context_cmd = DeriveContextCmd {
             handle: ContextHandle::default(),
             data: measurement,
-            flags: DeriveContextFlags::MAKE_DEFAULT
-                | DeriveContextFlags::INPUT_ALLOW_CA
-                | DeriveContextFlags::INPUT_ALLOW_X509,
+            flags: DeriveContextFlags::MAKE_DEFAULT | DeriveContextFlags::INPUT_ALLOW_X509,
             tci_type: u32::read_from_bytes(&tci_type[..]).unwrap(),
             target_locality: 0,
         };
