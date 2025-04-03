@@ -105,7 +105,7 @@ fn test_invoke_dpe_sign_and_certify_key_cmds() {
         &mut Command::Sign(&sign_cmd),
         DpeResult::Success,
     );
-    let Some(Response::Sign(sign_resp)) = resp else {
+    let Some(Response::EcdsaSign(sign_resp)) = resp else {
         panic!("Wrong response type!");
     };
 
@@ -158,7 +158,7 @@ fn test_invoke_dpe_asymmetric_sign() {
         &mut Command::Sign(&sign_cmd),
         DpeResult::Success,
     );
-    let Some(Response::Sign(sign_resp)) = resp else {
+    let Some(Response::EcdsaSign(sign_resp)) = resp else {
         panic!("Wrong response type!");
     };
 

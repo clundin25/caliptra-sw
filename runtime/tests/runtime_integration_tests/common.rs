@@ -317,7 +317,7 @@ fn parse_dpe_response(dpe_cmd: &mut Command, resp_bytes: &[u8]) -> Response {
         Command::RotateCtx(_) => {
             Response::RotateCtx(NewHandleResp::read_from_bytes(resp_bytes).unwrap())
         }
-        Command::Sign(_) => Response::Sign(SignResp::read_from_bytes(resp_bytes).unwrap()),
+        Command::Sign(_) => Response::EcdsaSign(SignResp::read_from_bytes(resp_bytes).unwrap()),
     }
 }
 
