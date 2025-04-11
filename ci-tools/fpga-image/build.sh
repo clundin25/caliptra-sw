@@ -41,8 +41,6 @@ if [[ -z "${SKIP_DEBOOTSTRAP}" ]]; then
   chroot out/rootfs bash -c 'echo auto end0 > /etc/network/interfaces'
   chroot out/rootfs bash -c 'echo allow-hotplug end0 >> /etc/network/interfaces'
   chroot out/rootfs bash -c 'echo iface end0 inet6 auto >> /etc/network/interfaces'
-  chroot out/rootfs bash -c 'echo nameserver 2001:4860:4860::6464 > /etc/resolv.conf'
-  chroot out/rootfs bash -c 'echo nameserver 2001:4860:4860::64 >> /etc/resolv.conf'
   chroot out/rootfs bash -c 'echo kernel.softlockup_panic = 1 >> /etc/sysctl.conf'
   chroot out/rootfs bash -c 'echo kernel.softlockup_all_cpu_backtrace = 1 >> /etc/sysctl.conf'
   chroot out/rootfs bash -c 'echo kernel.panic_print = 127 >> /etc/sysctl.conf'
