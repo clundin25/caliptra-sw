@@ -20,7 +20,7 @@ if ! (echo "${SYSTEM_BOOT_SHA256} out/system-boot.tar.gz" | sha256sum -c); then
 fi
 
 # Build the rootfs
-export SKIP_DEBOOTSTRAP=true
+# export SKIP_DEBOOTSTRAP=true
 if [[ -z "${SKIP_DEBOOTSTRAP}" ]]; then
   (rm -rf out/rootfs || true)
   mkdir -p out/rootfs
