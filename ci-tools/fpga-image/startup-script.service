@@ -1,6 +1,9 @@
 
 [Unit]
 After=serial-getty.target
+Wants=serial-getty.target
+After=time-sync.target
+Wants=time-sync.target
 After=network-online.target
 Wants=network-online.target
 Conflicts=serial-getty@ttyAMA0.service
