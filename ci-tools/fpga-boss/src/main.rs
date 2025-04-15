@@ -161,6 +161,26 @@ fn log_uart_until<R: BufRead>(lines: &mut Lines<R>, needle: &str) -> std::io::Re
                 }
             },
             Err(e) if e.kind() == ErrorKind::TimedOut => {
+                // Swallow time out.
+            },
+            Err(e) => {
+                println!("UART error: {}", e);
+            }
+        }
+    }
+    Err(Error::new(ErrorKind::UnexpectedEof, "unexpected EOF"))
+}
+
+fn log_uart_until_with_timeout<R: BufRead>(lines: &mut Lines<R>, needle: &str) -> std::io::Result<()> {
+    for line in lines.by_ref() {
+        match line {
+            Ok(line) => {
+                println!("UART: {}", line);
+                if line.contains(needle) {
+                    return Ok(());
+                }
+            },
+            Err(e) if e.kind() == ErrorKind::TimedOut => {
                 return Err(e);
             },
             Err(e) => {
@@ -304,6 +324,7 @@ fn main_impl() -> anyhow::Result<()> {
             }
         }
         Some(("serve", sub_matches)) => {
+            let mut last_token: Option<Vec<u8>> = None;
             let mut fpga = get_fpga_ftdi()?;
             let mut sd_mux = get_sd_mux()?;
             let sd_dev_path = get_sd_dev_path()?;
@@ -326,9 +347,9 @@ fn main_impl() -> anyhow::Result<()> {
                     std::thread::sleep(Duration::from_millis(100));
                 }
 
-                const ONE_HOUR: u64 = 3_600;
+                const THREE_MINS: u64 = 180;
                 let (uart_rx, mut uart_tx) =
-                    ftdi_uart::open_blocking(get_zcu104_path()?, ftdi_interface::INTERFACE_B, Some(Duration::from_secs(ONE_HOUR)))?;
+                    ftdi_uart::open_blocking(get_zcu104_path()?, ftdi_interface::INTERFACE_B, Some(Duration::from_secs(THREE_MINS)))?;
 
                 println!("Taking FPGA out of reset");
                 sd_mux.set_target(SdMuxTarget::Dut)?;
@@ -348,23 +369,42 @@ fn main_impl() -> anyhow::Result<()> {
                     _ => (),
                 }
 
-                let command_args: Vec<_> =
-                    sub_matches.get_many::<OsString>("CMD").unwrap().collect();
+                if last_token.is_none() {
+                    let command_args: Vec<_> =
+                        sub_matches.get_many::<OsString>("CMD").unwrap().collect();
 
-                println!("Executing command {:?} to retrieve jitconfig", command_args);
-                let output = std::process::Command::new(command_args[0])
-                    .args(&command_args[1..])
-                    .stderr(Stdio::inherit())
-                    .output()?;
-                if !output.status.success() {
-                    println!("Error retrieving jitconfig: stdout:");
-                    stdout().write_all(&output.stdout)?;
-                    continue;
+                    println!("Executing command {:?} to retrieve jitconfig", command_args);
+                    let output = std::process::Command::new(command_args[0])
+                        .args(&command_args[1..])
+                        .stderr(Stdio::inherit())
+                        .output()?;
+                    if !output.status.success() {
+                        println!("Error retrieving jitconfig: stdout:");
+                        stdout().write_all(&output.stdout)?;
+                        continue;
+                    }
+                    last_token = Some(output.stdout);
                 }
 
+                // VCK-190 needs some extra time before we write to it.
+                std::thread::sleep(Duration::from_secs(3));
                 uart_tx.write_all(b"runner-jitconfig ")?;
-                uart_tx.write_all(&output.stdout)?;
+                uart_tx.write_all(&last_token.clone().unwrap())?;
                 uart_tx.write_all(b"\n")?;
+
+                match log_uart_until_with_timeout(
+                    &mut uart_lines,
+                    "Listening for Jobs",
+                ) {
+                    Err(e) if e.kind() == ErrorKind::TimedOut => {
+                        eprintln!("Timed out waiting for FPGA to connect to Github!");
+                        continue 'outer;
+                    },
+                    Err(e) => Err(e)?,
+                    _ => (),
+                }
+
+                last_token = None;
 
                 match log_uart_until(
                     &mut uart_lines,
