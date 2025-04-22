@@ -118,3 +118,157 @@ The serve subcommand runs in a loop that does the following:
 ![Photo of FPGA Farm](./images/fpga-farm.jpg)
 
 ![Block Diagram](./../github-runner/images/caliptra-github-ci.svg)
+
+# Raspberry PI Setup Instructions
+
+## RPI Setup
+
+1. Install Rust
+1. Install fpga-boss and cred-tool.
+    - `cargo install --git https://github.com/chipsalliance/caliptra-sw.git caliptra-fpga-boss --branch main`
+    - `cargo install --git https://github.com/clundin25/cred-tool.git`
+        - TODO(clundin): Maybe just install the binaries to `/usr/bin`
+1. Download the latest FPGA image from [GitHub](https://github.com/chipsalliance/caliptra-sw/actions/workflows/fpga-image.yml). This job is scheduled to run once a week.
+    - In the following examples, the image is stored in `$HOME/zcu-scripts/zcu104.img` for the Raspberry PI user.
+1. Get a GitHub Application private key for the CI. This is used to sign JWTs used by the FPGA runners.
+    - The template below stores this file at `/etc/secrets/caliptra-gce-ci-github-private-key-pem/prod`.
+
+## UDEV rules
+
+Add UDEV rules for the hardware that is involved to avoid running the CI as root.
+
+Here is an example from my RPI:
+
+```
+runner@caliptrarpi:~/zcu104-scripts $ cat /etc/udev/rules.d/99-fpga.rules
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6011", OWNER="runner", GROUP="runner"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="04e8", ATTRS{idProduct}=="6001", OWNER="runner", GROUP="runner"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="0424", ATTRS{idProduct}=="2640", OWNER="runner", GROUP="runner"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="0424", ATTRS{idProduct}=="4050", OWNER="runner", GROUP="runner"
+```
+
+These rules are for the FTDI / SDWIRE USB hosts, as well as the SD Cards that I use. You may have different vendors and products.
+
+## FPGA Bash Script Template
+
+This is a template bash script used to manage each FPGA. 
+
+The following placeholders are populated in subsequent sections:
+* `ZCU_FTDI`
+* `ZCU_SDWIRE`
+* `IDENTIFIER`
+* `LOCATION`
+
+```
+#!/bin/bash
+
+ZCU_FTDI="" # TODO: Update me!
+ZCU_SDWIRE="" # TODO: Update me!
+IDENTIFIER="" # TODO: Update me!
+LOCATION="" # TODO: Update me!
+IMAGE="$HOME/zcu104-scripts/zcu104.img"
+
+$HOME/.cargo/bin/caliptra-fpga-boss --zcu104 $ZCU_FTDI --sdwire $ZCU_SDWIRE serve $IMAGE -- $HOME/.cargo/bin/cred-tool --stage prod --fpga-target zcu104 --fpga-identifier $IDENTIFIER --location $LOCATION --key-path /etc/secrets/caliptra-gce-ci-github-private-key-pem/prod
+```
+
+### Populating ZCU_FTDI
+
+This is alternatively documented above in "How do I determine the `--zcu104` parameter for my hardware?". We will use a different method because we will most likely be connecting multiple FPGAs.
+
+First, open a terminal window with `dmesg -w` on the Raspberry PI. I recommend using tmux so we don't have to tab back and forth between the script and dmesg.
+
+Plug in a micro-usb cable to the FPGA serial port and to your Raspberry PI. You should see a log like this:
+
+```
+[ 1360.519412] usbserial: USB Serial support registered for FTDI USB Serial Device
+[ 1360.519630] ftdi_sio 1-1.1.3:1.0: FTDI USB Serial Device converter detected
+[ 1360.519783] usb 1-1.1.3: Detected FT4232H
+[ 1360.520694] usb 1-1.1.3: FTDI USB Serial Device converter now attached to ttyUSB0
+```
+
+Based on the above log, we would set the `ZCU_FTDI` variable to `1-1.1.3`. This is the USB path to the device.
+
+### Populating ZCU_SDWIRE
+
+This is alternatively documented above in "How do I determine the `--sdwire` parameter for my hardware?". We will use a different method because we will most likely be connecting multiple FPGAs.
+
+First, open a terminal window with `dmesg -w` on the Raspberry PI. I recommend using tmux so we don't have to tab back and forth between the script and dmesg.
+
+Plug in the SDWire. You should see a log like this:
+
+```
+[ 1266.724822] usb-storage 1-1.1.4.1:1.0: USB Mass Storage device detected
+[ 1266.725524] scsi host0: usb-storage 1-1.1.4.1:1.0
+[ 1266.803147] usb 1-1.1.4.2: new full-speed USB device number 6 using xhci_hcd
+[ 1266.908861] usb 1-1.1.4.2: New USB device found, idVendor=04e8, idProduct=6001, bcdDevice=10.00
+[ 1266.908892] usb 1-1.1.4.2: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+[ 1266.908906] usb 1-1.1.4.2: Product: sd-wire
+[ 1266.908918] usb 1-1.1.4.2: Manufacturer: SRPOL
+[ 1266.908928] usb 1-1.1.4.2: SerialNumber: bdgrd_sdwirec_593
+```
+
+Based on the above log, we would set the `ZCU_SDWIRE` variable to `1-1.1.4`. This is the USB path to the device.
+
+### Populating IDENTIFIER
+
+This is a unique string or number to differentiate co-located FPGAs.
+
+In Kirkland, each FPGA is assigned an incrementing number, e.g. 1, 2, 3, 4, etc.
+
+### Populating Location
+
+This identifies where the FPGAs are located. For Kirkland we use "kir", in Sunnyvale we use "svl".
+Other companies should also include the company name in this field.
+
+### Saving the bash script
+
+I recommend saving the bash file to `$HOME/zcu104-scripts/zcu-$IDENTIFIER.sh` to help differentiate between FPGAs.
+
+### Testing the script
+
+Run the bash script to see if everything works. A successful run will end with the following output:
+
+```
+Apr 21 16:55:26 caliptrarpi bash[2201]: UART: Executing GHA runner
+Apr 21 16:55:37 caliptrarpi bash[2201]: UART:
+Apr 21 16:55:37 caliptrarpi bash[2201]: UART: √ Connected to GitHub
+Apr 21 16:55:37 caliptrarpi bash[2201]: UART:
+Apr 21 16:55:38 caliptrarpi bash[2201]: UART: Current runner version: '2.323.0'
+Apr 21 16:55:38 caliptrarpi bash[2201]: UART: 2025-04-21 23:55:37Z: Listening for Jobs
+```
+
+
+## Managing the FPGA with systemd
+
+I recommend wrapping the FPGA scripts with systemd for easier management.
+
+Here is a template:
+
+```
+[Unit]
+Description=ZCU-0 Service
+After=network.target sshd.service
+Wants=network.target
+
+[Service]
+User=runner
+Type=simple
+Restart=on-failure
+RestartSec=15s
+StartLimitInterval=60m
+StartLimitBurst=3
+ExecStart=/usr/bin/bash /home/runner/zcu104-scripts/zcu-0.sh
+
+[Install]
+WantedBy=multi-user.target
+```
+
+TODO(clundin): Tweak the retry parameters to happen over a longer time period (Maybe 24 hours?).
+
+## Starting the FPGA service
+
+```
+$ sudo systemctl enable zcu-0 # We want the FPGA service to start when the RPI is rebooted.
+$ sudo systemctl start zcu-0
+$ journalctl -u zcu-0 -f # Monitor the FPGA to make sure everything is working.
+```
