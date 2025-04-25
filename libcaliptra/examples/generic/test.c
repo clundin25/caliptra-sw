@@ -669,15 +669,16 @@ int rt_test_all_commands(const test_info* info)
     struct caliptra_invoke_dpe_req dpe_req = {};
     struct caliptra_invoke_dpe_resp dpe_resp;
 
-    dpe_req.data_size = sizeof(struct dpe_get_profile_cmd);
-    dpe_req.get_profile_cmd.cmd_hdr.magic = DPE_MAGIC;
-    dpe_req.get_profile_cmd.cmd_hdr.cmd_id = DPE_GET_PROFILE;
-    dpe_req.get_profile_cmd.cmd_hdr.profile = 0x2;
+    dpe_req.data_size = sizeof(struct dpe_initialize_context_cmd);
+    dpe_req.initialize_context_cmd.cmd_hdr.magic = DPE_MAGIC;
+    dpe_req.initialize_context_cmd.cmd_hdr.cmd_id = DPE_INITIALIZE_CONTEXT;
+    dpe_req.initialize_context_cmd.cmd_hdr.profile = 0x4;
+    dpe_req.initialize_context_cmd.flags = 1 << 30;
 
     status = caliptra_invoke_dpe_command(&dpe_req, &dpe_resp, false);
 
-    if (status) {
-        printf("DPE Command failed: 0x%x\n", status);
+    if (status || dpe_resp.resp_hdr.status != 0) {
+        printf("DPE Command failed: 0x%x\n DPE Error code: %x\n", status, dpe_resp.resp_hdr.status);
         dump_caliptra_error_codes();
         failure = 1;
     } else {

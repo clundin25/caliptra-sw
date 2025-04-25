@@ -16,7 +16,7 @@ use crate::{
     CptraDpeTypes, DpeCrypto, DpeEnv, DpePlatform, Drivers, PauserPrivileges, PL0_PAUSER_FLAG,
 };
 use caliptra_cfi_derive_git::cfi_impl_fn;
-use caliptra_common::mailbox_api::{InvokeDpeReq, InvokeDpeResp, MailboxResp, MailboxRespHeader};
+use caliptra_common::{cprintln, mailbox_api::{InvokeDpeReq, InvokeDpeResp, MailboxResp, MailboxRespHeader}};
 use caliptra_drivers::{CaliptraError, CaliptraResult};
 use crypto::{AlgLen, Crypto};
 use dpe::{
@@ -148,8 +148,12 @@ impl InvokeDpeCmd {
             // If DPE command failed, populate header with error code, but
             // don't fail the mailbox command.
             let resp_struct = match resp {
-                Ok(r) => r,
+                Ok(r) => {
+                    cprintln!("DPE command passed");
+                    r
+                },
                 Err(e) => {
+                    cprintln!("DPE command failed");
                     // If there is extended error info, populate CPTRA_FW_EXTENDED_ERROR_INFO
                     if let Some(ext_err) = e.get_error_detail() {
                         drivers.soc_ifc.set_fw_extended_error(ext_err);
