@@ -1,5 +1,6 @@
 // Licensed under the Apache-2.0 license
 
+use prost::Message;
 use ghac::v1::{self as ghac_types, GetCacheEntryDownloadUrlResponse};
 use serde::{Deserialize, Serialize};
 
@@ -54,13 +55,14 @@ impl Cache for GithubActionCache {
             metadata: None,
             restore_keys: vec![],
         };
-        let body = Buffer::from(request.encode_to_vec());
+        let content = Content::octet_stream(request.encode_to_vec());
+        let body = Some(&content);
         let response = http::api_post(&format!("{}/GetCacheEntryDownloadURL", self.prefix), body)?;
         if response.status == 204 {
             return Ok(None);
         }
         let response: GetCacheEntryDownloadUrlResponse =
-            GetCacheEntryDownloadUrlResponse::decode(response.data)?;
+            GetCacheEntryDownloadUrlResponse::decode(response.data.as_ref())?;
         if response.matched_key != url_key {
             return Err(other_err(format!(
                 "Expected key {url_key:?}, was {:?}",
