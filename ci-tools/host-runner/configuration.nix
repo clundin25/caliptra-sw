@@ -30,6 +30,8 @@
   networking.hostName = "caliptra-hostrunner${identifier}";
 
   services.openssh.enable = true;
+  services.openssh.settings.PasswordAuthentication = false;
+
   security.sudo.wheelNeedsPassword = true;
 
   users.mutableUsers = false;
@@ -53,6 +55,11 @@
     git
     tmux
     libftdi1
+    fzf
+    ripgrep
+    fd
+    jq
+
     ((pkgs.callPackage ./tools/cred-tool.nix {}))
     ((pkgs.callPackage ./tools/fpga-boss.nix {}))
   ];
@@ -64,4 +71,16 @@
     SUBSYSTEMS=="usb", ATTRS{idVendor}=="0424", ATTRS{idProduct}=="2640", OWNER="${user}", GROUP="users"
     SUBSYSTEMS=="usb", ATTRS{idVendor}=="0424", ATTRS{idProduct}=="4050", OWNER="${user}", GROUP="users"
     '';
+
+  # Host runner secrets
+  environment.etc = {
+    # Github Key for fpga boss
+     github-key = {
+      text = builtins.readFile ./secrets/google/prod;
+      mode = "0400";
+      user = "${user}";
+      target = "secrets/caliptra-gce-ci-github-private-key-pem/prod";
+    };
+  };
+
 }
