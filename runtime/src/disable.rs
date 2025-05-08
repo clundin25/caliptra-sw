@@ -54,11 +54,12 @@ impl DisableAttestationCmd {
     ///
     /// * `drivers` - Drivers
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
+    #[inline(never)]
     fn zero_cdi(drivers: &mut Drivers, key: KeyId) -> CaliptraResult<()> {
         hmac384_kdf(
             &mut drivers.hmac384,
             Hmac384Key::Array4x12(&Array4x12::default()),
-            b"zero_rt_cdi",
+            b"zero_cdi",
             None,
             &mut drivers.trng,
             KeyWriteArgs::new(
