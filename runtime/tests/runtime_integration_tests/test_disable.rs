@@ -42,7 +42,7 @@ fn test_disable_attestation_cmd() {
         &mut Command::Sign(&sign_cmd),
         DpeResult::Success,
     );
-    let Some(Response::Sign(sign_resp)) = resp else {
+    let Some(Response::EcdsaSign(sign_resp)) = resp else {
         panic!("Wrong response type!");
     };
 

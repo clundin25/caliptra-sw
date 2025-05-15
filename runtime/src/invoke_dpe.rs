@@ -149,7 +149,7 @@ impl InvokeDpeCmd {
                     if let Some(ext_err) = e.get_error_detail() {
                         drivers.soc_ifc.set_fw_extended_error(ext_err);
                     }
-                    Response::Error(ResponseHdr::new(e))
+                    Response::Error(dpe.response_hdr(e))
                 }
             };
 

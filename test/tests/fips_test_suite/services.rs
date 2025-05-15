@@ -513,7 +513,7 @@ pub fn exec_dpe_sign<T: HwModel>(hw: &mut T) {
 
     let resp = execute_dpe_cmd(hw, &mut Command::Sign(&sign_cmd));
 
-    let Response::Sign(sign_resp) = resp else {
+    let Response::EcdsaSign(sign_resp) = resp else {
         panic!("Wrong response type!");
     };
 
