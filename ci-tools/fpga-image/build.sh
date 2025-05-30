@@ -82,9 +82,6 @@ su $SUDO_USER -c "
 
 cp /tmp/cargo-nextest/bin/cargo-nextest out/rootfs/usr/bin/
 
-chroot out/rootfs bash -c 'echo LINUX_KERNEL_CMDLINE="earlycon=pl011,mmio32,0xFF000000,115200n8 root=/dev/mmcblk0p2 rootwait console=ttyAMA0,115200" > /etc/default/u-boot-xlnx'
-chroot out/rootfs bash -c 'cat /etc/default/u-boot-xlnx'
-
 chroot out/rootfs bash -c 'echo ::1 caliptra-fpga >> /etc/hosts'
 cp startup-script.sh out/rootfs/usr/bin/
 chroot out/rootfs systemctl set-default multi-user.target
