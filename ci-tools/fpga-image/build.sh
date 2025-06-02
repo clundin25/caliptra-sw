@@ -10,7 +10,7 @@ set -x
 
 mkdir -p out
 
-curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-kernel-with-squashfs.gz" -o out/system-boot.tar.gz
+curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-kernel-with-squashfs-fs.tar.gz" -o out/system-boot.tar.gz
 #scp /usr/local/google/home/clundin/vck190-kernel-with-rw-root.tar.gz out/system-boot.tar.gz
 # scp /usr/local/google/home/clundin/vck190-kernel-with-rw-root.gz out/system-boot.tar.gz
 # scp /usr/local/google/home/clundin/vck190-kernel-with-squashfs.gz out/system-boot.tar.gz
@@ -31,7 +31,7 @@ curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v202
 if [[ -z "${SKIP_DEBOOTSTRAP}" ]]; then
   (rm -rf out/rootfs || true)
   mkdir -p out/rootfs
-  debootstrap --include git,curl,ca-certificates,locales,libicu72,sudo,vmtouch,fping,rdnssd,dbus,systemd-timesyncd,libboost-regex1.74.0,openocd,gdb-multiarch --arch arm64 --foreign bookworm out/rootfs
+  debootstrap --include git,curl,ca-certificates,locales,libicu72,sudo,vmtouch,fping,rdnssd,dbus,systemd-timesyncd,libboost-regex1.74.0,openocd,gdb-multiarch,squashfs-tools --arch arm64 --foreign bookworm out/rootfs
   chroot out/rootfs /debootstrap/debootstrap --second-stage
   chroot out/rootfs useradd runner --shell /bin/bash --create-home
 
