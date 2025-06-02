@@ -10,7 +10,7 @@ set -x
 
 mkdir -p out
 
-scp /usr/local/google/home/clundin/vck190-kernel-with-squashfs-fs.tar.gz out/system-boot.tar.gz
+curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-kernel-with-squashfs.gz" -o out/system-boot.tar.gz
 #scp /usr/local/google/home/clundin/vck190-kernel-with-rw-root.tar.gz out/system-boot.tar.gz
 # scp /usr/local/google/home/clundin/vck190-kernel-with-rw-root.gz out/system-boot.tar.gz
 # scp /usr/local/google/home/clundin/vck190-kernel-with-squashfs.gz out/system-boot.tar.gz
