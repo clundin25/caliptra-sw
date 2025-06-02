@@ -82,8 +82,8 @@ su $SUDO_USER -c "
 
 
 cp /tmp/cargo-nextest/bin/cargo-nextest out/rootfs/usr/bin/
-chroot out/rootfs bash -c 'ldd -v /usr/bin/cargo-nextest'
-chroot out/rootfs bash -c 'ld -v'
+# chroot out/rootfs bash -c 'ldd -v /usr/bin/cargo-nextest'
+# chroot out/rootfs bash -c 'ld -v'
 
 chroot out/rootfs bash -c 'echo ::1 caliptra-fpga >> /etc/hosts'
 cp startup-script.sh out/rootfs/usr/bin/
