@@ -26,7 +26,7 @@ curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v202
 #   fi
 # fi
 
-export SKIP_DEBOOTSTRAP=1
+# export SKIP_DEBOOTSTRAP=1
 # Build the rootfs
 if [[ -z "${SKIP_DEBOOTSTRAP}" ]]; then
   (rm -rf out/rootfs || true)
