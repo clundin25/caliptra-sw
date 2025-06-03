@@ -10,7 +10,8 @@ set -x
 
 mkdir -p out
 
-curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-kernel-correct-bitstream.tar.gz" -o out/system-boot.tar.gz
+curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-kernel-random-mac-with-correct-bitstream.tar.gz" -o out/system-boot.tar.gz
+# curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-kernel-correct-bitstream.tar.gz" -o out/system-boot.tar.gz
 # curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-kernel-with-correct-bitstream.tar.gz" -o out/system-boot.tar.gz
 # curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-kernel-with-squashfs-fs.tar.gz" -o out/system-boot.tar.gz
 curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/io-module.ko" -o out/io-module.ko
@@ -94,7 +95,7 @@ chroot out/rootfs systemctl set-default multi-user.target
 chroot out/rootfs chmod 755 /usr/bin/startup-script.sh
 cp startup-script.service out/rootfs/etc/systemd/system/
 chroot out/rootfs systemctl enable startup-script.service
-cp out/io-module.ko out/rootfs/lib/io-module.ko
+cp out/io-module.ko out/rootfs/home/runner/io-module.ko
 
 (rm -r out/image.img || true)
 

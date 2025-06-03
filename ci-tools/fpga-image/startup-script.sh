@@ -10,6 +10,8 @@ echo 3 > /proc/sys/kernel/printk
 
 mount -o rw,remount /
 
+insmod /home/runner/io-module.ko
+
 function runner_jitconfig() {
   echo "Executing GHA runner"
   su runner -c "./run.sh --jitconfig \"${cmd_array[1]}\""
