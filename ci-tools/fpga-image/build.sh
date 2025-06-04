@@ -10,7 +10,7 @@ set -x
 
 mkdir -p out
 
-curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-random-mac-attempt-two.tar.gz" -o out/system-boot.tar.gz
+curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-random-mac-attempt-three.tar.gz" -o out/system-boot.tar.gz
 # curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-random-mac.tar.gz" -o out/system-boot.tar.gz
 # curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-kernel-random-mac-with-correct-bitstream.tar.gz" -o out/system-boot.tar.gz
 # curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-kernel-correct-bitstream.tar.gz" -o out/system-boot.tar.gz
