@@ -58,8 +58,7 @@ use dpe::{
 };
 
 use core::cmp::Ordering::{Equal, Greater};
-use crypto::CryptoBuf;
-use zerocopy::IntoBytes;
+use zerocopy::{IntoBytes, TryFromBytes};
 
 #[derive(PartialEq, Clone)]
 pub enum PauserPrivileges {
@@ -347,11 +346,12 @@ impl Drivers {
 
     /// Compute the Caliptra Name SerialNumber by Sha256 hashing the RT Alias public key
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
-    pub fn compute_rt_alias_sn(&mut self) -> CaliptraResult<CryptoBuf> {
+    pub fn compute_rt_alias_sn(&mut self) -> CaliptraResult<crypto::Sha256> {
         let key = self.persistent_data.get().fht.rt_dice_pub_key.to_der();
 
         let rt_digest = self.sha256.digest(&key)?;
-        let token = CryptoBuf::new(&Into::<[u8; 32]>::into(rt_digest))
+        let rt_digest = Into::<[u8; 32]>::into(rt_digest);
+        let token = crypto::Sha256::try_read_from_bytes(&rt_digest)
             .map_err(|_| CaliptraError::RUNTIME_COMPUTE_RT_ALIAS_SN_FAILED)?;
 
         Ok(token)
@@ -428,8 +428,8 @@ impl Drivers {
                 .try_into()
                 .map_err(|_| CaliptraError::RUNTIME_ADD_VALID_PAUSER_MEASUREMENT_TO_DPE_FAILED)?,
             flags: DeriveContextFlags::MAKE_DEFAULT
+                | DeriveContextFlags::ALLOW_NEW_CONTEXT_TO_EXPORT
                 | DeriveContextFlags::CHANGE_LOCALITY
-                | DeriveContextFlags::INPUT_ALLOW_CA
                 | DeriveContextFlags::INPUT_ALLOW_X509,
             tci_type: u32::from_be_bytes(*b"MBVP"),
             target_locality: pl0_pauser_locality,
@@ -466,7 +466,7 @@ impl Drivers {
                     .map_err(|_| CaliptraError::RUNTIME_ADD_ROM_MEASUREMENTS_TO_DPE_FAILED)?,
                 flags: DeriveContextFlags::MAKE_DEFAULT
                     | DeriveContextFlags::CHANGE_LOCALITY
-                    | DeriveContextFlags::INPUT_ALLOW_CA
+                    | DeriveContextFlags::ALLOW_NEW_CONTEXT_TO_EXPORT
                     | DeriveContextFlags::INPUT_ALLOW_X509,
                 tci_type,
                 target_locality: pl0_pauser_locality,
