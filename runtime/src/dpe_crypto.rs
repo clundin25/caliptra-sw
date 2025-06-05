@@ -25,7 +25,7 @@ use caliptra_drivers::{
 };
 use crypto::{
     ecdsa::{
-        curve_384::{EcdsaPub384, EcdsaSignature384},
+        curve_384::{self, EcdsaPub384, EcdsaSignature384},
         EcdsaPubKey, EcdsaSignature,
     },
     Crypto, CryptoEngine, CryptoError, Digest, DigestAlgorithm, DigestType, ExportedPubKey, Hasher,
@@ -152,8 +152,8 @@ impl<'a> DpeCrypto<'a> {
             )
             .map_err(|e| CryptoError::CryptoLibError(u32::from(e)))?;
         let pub_key = EcdsaPub384::from_slice(
-            &<[u8; EcdsaPub384::curve_size()]>::from(pub_key.x),
-            &<[u8; EcdsaPub384::curve_size()]>::from(pub_key.y),
+            &<[u8; curve_384::CURVE_SIZE]>::from(pub_key.x),
+            &<[u8; curve_384::CURVE_SIZE]>::from(pub_key.y),
         )?;
         Ok((key_id, pub_key))
     }
@@ -357,8 +357,8 @@ impl Crypto for DpeCrypto<'_> {
 
     fn sign_with_alias(&mut self, digest: &Digest) -> Result<Signature, CryptoError> {
         let pub_key = EcdsaPub384::from_slice(
-            &<[u8; EcdsaPub384::curve_size()]>::from(self.rt_pub_key.x),
-            &<[u8; EcdsaPub384::curve_size()]>::from(self.rt_pub_key.y),
+            &<[u8; curve_384::CURVE_SIZE]>::from(self.rt_pub_key.x),
+            &<[u8; curve_384::CURVE_SIZE]>::from(self.rt_pub_key.y),
         )?;
         self.sign_with_derived(digest, &self.key_id_rt_priv_key.clone(), &pub_key)
     }
