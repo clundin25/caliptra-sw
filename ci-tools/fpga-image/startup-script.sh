@@ -12,7 +12,9 @@ mount -o rw,remount /
 
 insmod /home/runner/io-module.ko
 
+ip link set dev end0 down
 macchanger -r end0 || true
+ip link set dev end0 up
 
 function runner_jitconfig() {
   echo "Executing GHA runner"
