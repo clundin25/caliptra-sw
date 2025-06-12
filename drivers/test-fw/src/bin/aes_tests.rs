@@ -5,9 +5,9 @@
 
 use caliptra_cfi_lib::CfiCounter;
 use caliptra_drivers::{
-    hmac_kdf, Aes, AesKey, Array4x12, Array4x16, Array4x8, Ecc384, Ecc384PrivKeyOut,
-    Ecc384Scalar, Ecc384Seed, Hmac, HmacKey, HmacMode, HmacTag, KeyId, KeyReadArgs,
-    KeyUsage, KeyWriteArgs, Sha256, Sha256Alg, Sha256DigestOp, Trng,
+    hmac_kdf, Aes, AesKey, Array4x12, Array4x16, Array4x8, Ecc384, Ecc384PrivKeyOut, Ecc384Scalar,
+    Ecc384Seed, Hmac, HmacKey, HmacMode, HmacTag, KeyId, KeyReadArgs, KeyUsage, KeyWriteArgs,
+    Sha256, Sha256Alg, Sha256DigestOp, Trng,
 };
 use caliptra_registers::aes::AesReg;
 use caliptra_registers::aes_clp::AesClpReg;
