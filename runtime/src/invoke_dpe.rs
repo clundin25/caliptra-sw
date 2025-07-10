@@ -21,7 +21,8 @@ use caliptra_drivers::{CaliptraError, CaliptraResult};
 use crypto::Crypto;
 use dpe::{
     commands::{
-        CertifyKeyCmd, Command, CommandExecution, DeriveContextCmd, DeriveContextFlags, InitCtxCmd,
+        CertifyKeyCommand, Command, CommandExecution, DeriveContextCmd, DeriveContextFlags,
+        InitCtxCmd,
     },
     context::{Context, ContextState},
     response::{Response, ResponseHdr},
@@ -128,8 +129,11 @@ impl InvokeDpeCmd {
                     cmd.execute(&mut dpe, &mut env, locality)
                 }
                 Command::CertifyKey(cmd) => {
+                    let format = match cmd {
+                        CertifyKeyCommand::P384(cmd) => cmd.format,
+                    };
                     // PL1 cannot request X509
-                    if cmd.format == CertifyKeyCmd::FORMAT_X509
+                    if format == CertifyKeyCommand::FORMAT_X509
                         && caller_privilege_level != PauserPrivileges::PL0
                     {
                         return Err(CaliptraError::RUNTIME_INCORRECT_PAUSER_PRIVILEGE_LEVEL);

@@ -21,7 +21,7 @@ use caliptra_hw_model::{
     StackInfo, StackRange,
 };
 use dpe::{
-    commands::{Command, CommandHdr, DeriveContextCmd, DeriveContextFlags},
+    commands::{Command, CommandHdr, DeriveContextCmd, DeriveContextFlags, SignCommand},
     response::{
         CertifyKeyResp, DeriveContextExportedCdiResp, DeriveContextResp, DpeErrorCode,
         GetCertificateChainResp, GetProfileResp, NewHandleResp, Response, ResponseHdr, SignResp,
@@ -197,9 +197,9 @@ fn parse_dpe_response(dpe_cmd: &mut Command, resp_bytes: &[u8]) -> Response {
     check_dpe_status(resp_bytes, DpeErrorCode::NoError);
 
     match dpe_cmd {
-        Command::CertifyKey(_) => {
-            Response::CertifyKey(CertifyKeyResp::try_read_from_bytes(resp_bytes).unwrap())
-        }
+        Command::CertifyKey(_) => Response::CertifyKey(
+            CertifyKeyResp::try_read_from_bytes(resp_bytes).unwrap(),
+        ),
         Command::DeriveContext(DeriveContextCmd { flags, .. })
             if flags.contains(DeriveContextFlags::EXPORT_CDI) =>
         {

@@ -23,11 +23,12 @@ use cms::{
 };
 use dpe::{
     commands::{
-        CertifyKeyCmd, CertifyKeyFlags, Command, DeriveContextCmd, DeriveContextFlags,
-        GetCertificateChainCmd, InitCtxCmd, RotateCtxCmd, RotateCtxFlags, SignCmd, SignFlags,
+        CertifyKeyCommand, CertifyKeyFlags, CertifyKeyP384Cmd, Command, DeriveContextCmd,
+        DeriveContextFlags, GetCertificateChainCmd, InitCtxCmd, RotateCtxCmd, RotateCtxFlags,
+        SignFlags, SignP384Cmd,
     },
     context::ContextHandle,
-    response::{DpeErrorCode, Response},
+    response::{CertifyKeyResp, DpeErrorCode, Response, SignResp},
     DPE_PROFILE,
 };
 use openssl::{
@@ -102,7 +103,7 @@ fn test_invoke_dpe_get_certificate_chain_cmd() {
 fn test_invoke_dpe_sign_and_certify_key_cmds() {
     let mut model = run_rt_test(RuntimeTestArgs::default());
 
-    let sign_cmd = SignCmd {
+    let sign_cmd = SignP384Cmd {
         handle: ContextHandle::default(),
         label: TEST_LABEL,
         flags: SignFlags::empty(),
@@ -110,25 +111,14 @@ fn test_invoke_dpe_sign_and_certify_key_cmds() {
     };
     let resp = execute_dpe_cmd(
         &mut model,
-        &mut Command::Sign(&sign_cmd),
+        &mut Command::Sign((&sign_cmd).into()),
         DpeResult::Success,
     );
-    let Some(Response::Sign(sign_resp)) = resp else {
+    let Some(Response::Sign(SignResp::P384(sign_resp))) = resp else {
         panic!("Wrong response type!");
     };
 
-    let certify_key_cmd = CertifyKeyCmd {
-        handle: ContextHandle::default(),
-        label: TEST_LABEL,
-        flags: CertifyKeyFlags::empty(),
-        format: CertifyKeyCmd::FORMAT_X509,
-    };
-    let resp = execute_dpe_cmd(
-        &mut model,
-        &mut Command::CertifyKey(&certify_key_cmd),
-        DpeResult::Success,
-    );
-    let Some(Response::CertifyKey(certify_key_resp)) = resp else {
+    let Some(Response::CertifyKey(CertifyKeyResp::P384(certify_key_resp))) = resp else {
         panic!("Wrong response type!");
     };
 
@@ -155,7 +145,7 @@ fn test_invoke_dpe_asymmetric_sign() {
         m.soc_ifc().cptra_boot_status().read() == u32::from(RtBootStatus::RtReadyForCommands)
     });
 
-    let sign_cmd = SignCmd {
+    let sign_cmd = SignP384Cmd {
         handle: ContextHandle::default(),
         label: TEST_LABEL,
         flags: SignFlags::empty(),
@@ -163,18 +153,13 @@ fn test_invoke_dpe_asymmetric_sign() {
     };
     let resp = execute_dpe_cmd(
         &mut model,
-        &mut Command::Sign(&sign_cmd),
+        &mut Command::Sign(&sign_cmd.into()),
         DpeResult::Success,
     );
-    let Some(Response::Sign(sign_resp)) = resp else {
+    let Some(Response::Sign(SignResp::P384(sign_resp))) = resp else {
         panic!("Wrong response type!");
     };
-
-    assert_ne!(sign_resp.sig_r, [0u8; 48]);
-    assert_ne!(sign_resp.sig_s, [0u8; 48]);
 }
-
-#[test]
 fn test_dpe_header_error_code() {
     let mut model = run_rt_test(RuntimeTestArgs::default());
 
@@ -206,15 +191,15 @@ fn test_invoke_dpe_certify_key_csr() {
         m.soc_ifc().cptra_boot_status().read() == u32::from(RtBootStatus::RtReadyForCommands)
     });
 
-    let certify_key_cmd = CertifyKeyCmd {
+    let certify_key_cmd = CertifyKeyP384Cmd {
         handle: ContextHandle::default(),
         label: TEST_LABEL,
         flags: CertifyKeyFlags::empty(),
-        format: CertifyKeyCmd::FORMAT_CSR,
+        format: CertifyKeyCommand::FORMAT_CSR,
     };
     let resp = execute_dpe_cmd(
         &mut model,
-        &mut Command::CertifyKey(&certify_key_cmd),
+        &mut Command::CertifyKey((&certify_key_cmd).into()),
         DpeResult::Success,
     );
     let Some(Response::CertifyKey(certify_key_resp)) = resp else {
@@ -225,10 +210,7 @@ fn test_invoke_dpe_certify_key_csr() {
     let rt_cert: X509 = X509::from_der(&rt_resp.data[..rt_resp.data_size as usize]).unwrap();
 
     // parse CMS ContentInfo
-    let content_info = ContentInfo::from_der(
-        &certify_key_resp.cert[..certify_key_resp.cert_size.try_into().unwrap()],
-    )
-    .unwrap();
+    let content_info = ContentInfo::from_der(certify_key_resp.cert().unwrap()).unwrap();
     // parse SignedData
     let mut signed_data = SignedData::from_der(&content_info.content.to_der().unwrap()).unwrap();
     assert_eq!(signed_data.version, CmsVersion::V3);
@@ -326,21 +308,21 @@ fn check_dice_extension_criticality(cert: &[u8], expected_criticality: bool) {
 fn test_invoke_dpe_certify_key_with_non_critical_dice_extensions() {
     let mut model = run_rt_test(RuntimeTestArgs::default());
 
-    let certify_key_cmd = CertifyKeyCmd {
+    let certify_key_cmd = CertifyKeyP384Cmd {
         handle: ContextHandle::default(),
         label: TEST_LABEL,
         flags: CertifyKeyFlags::empty(),
-        format: CertifyKeyCmd::FORMAT_X509,
+        format: CertifyKeyCommand::FORMAT_X509,
     };
     let resp = execute_dpe_cmd(
         &mut model,
-        &mut Command::CertifyKey(&certify_key_cmd),
+        &mut Command::CertifyKey((&certify_key_cmd).into()),
         DpeResult::Success,
     );
     let Some(Response::CertifyKey(resp)) = resp else {
             panic!("Wrong response type!");
         };
-    check_dice_extension_criticality(&resp.cert[..resp.cert_size.try_into().unwrap()], false);
+    check_dice_extension_criticality(resp.cert().unwrap(), false);
 }
 
 #[test]

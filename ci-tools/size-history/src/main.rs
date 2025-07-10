@@ -96,7 +96,8 @@ fn real_main() -> io::Result<()> {
         }
     }
 
-    let git_commits = worktree.commit_log()?;
+    let mut git_commits = worktree.commit_log()?;
+    git_commits.truncate(3);
 
     env::set_current_dir(worktree.path)?;
 

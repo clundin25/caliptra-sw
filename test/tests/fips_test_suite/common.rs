@@ -340,9 +340,9 @@ pub fn as_bytes<'a>(dpe_cmd: &'a mut Command) -> &'a [u8] {
 
 pub fn parse_dpe_response(dpe_cmd: &mut Command, resp_bytes: &[u8]) -> Response {
     match dpe_cmd {
-        Command::CertifyKey(_) => {
-            Response::CertifyKey(CertifyKeyResp::try_read_from_bytes(resp_bytes).unwrap())
-        }
+        Command::CertifyKey(_) => Response::CertifyKey(
+            CertifyKeyResp::try_read_from_bytes(resp_bytes).unwrap(),
+        ),
         Command::DeriveContext(_) => {
             Response::DeriveContext(DeriveContextResp::try_read_from_bytes(resp_bytes).unwrap())
         }

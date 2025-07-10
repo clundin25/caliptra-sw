@@ -13,9 +13,12 @@ use caliptra_common::mailbox_api::{
 use caliptra_error::CaliptraError;
 use caliptra_hw_model::{BootParams, DefaultHwModel, HwModel, InitParams};
 use dpe::{
-    commands::{CertifyKeyCmd, CertifyKeyFlags, Command, DeriveContextCmd, DeriveContextFlags},
+    commands::{
+        CertifyKeyCommand, CertifyKeyFlags, CertifyKeyP384Cmd, Command, DeriveContextCmd,
+        DeriveContextFlags,
+    },
     context::ContextHandle,
-    response::{CertifyKeyResp, Response},
+    response::{CertifyKeyP384Resp, CertifyKeyResp, Response},
 };
 use openssl::{
     asn1::Asn1Time,
@@ -251,22 +254,21 @@ fn test_dpe_leaf_cert() {
     let rt_resp = get_rt_alias_cert(&mut model);
     let rt_cert: X509 = X509::from_der(&rt_resp.data[..rt_resp.data_size as usize]).unwrap();
 
-    let certify_key_cmd = CertifyKeyCmd {
+    let certify_key_cmd = CertifyKeyP384Cmd {
         handle: ContextHandle::default(),
         label: TEST_LABEL,
         flags: CertifyKeyFlags::empty(),
-        format: CertifyKeyCmd::FORMAT_X509,
+        format: CertifyKeyCommand::FORMAT_X509,
     };
     let resp = execute_dpe_cmd(
         &mut model,
-        &mut Command::CertifyKey(&certify_key_cmd),
+        &mut Command::CertifyKey((&certify_key_cmd).into()),
         DpeResult::Success,
     );
     let Some(Response::CertifyKey(certify_key_resp)) = resp else {
         panic!("Wrong response type!");
     };
-    let dpe_leaf_cert: X509 =
-        X509::from_der(&certify_key_resp.cert[..certify_key_resp.cert_size as usize]).unwrap();
+    let dpe_leaf_cert: X509 = X509::from_der(certify_key_resp.cert().unwrap()).unwrap();
 
     // Check that DPE Leaf Cert is signed by RT alias pub key and that subject/issuer names match
     assert!(dpe_leaf_cert
@@ -316,15 +318,15 @@ fn test_full_cert_chain() {
 }
 
 fn get_dpe_leaf_cert(model: &mut DefaultHwModel) -> CertifyKeyResp {
-    let certify_key_cmd = CertifyKeyCmd {
+    let certify_key_cmd = CertifyKeyP384Cmd {
         handle: ContextHandle::default(),
         label: TEST_LABEL,
         flags: CertifyKeyFlags::empty(),
-        format: CertifyKeyCmd::FORMAT_X509,
+        format: CertifyKeyCommand::FORMAT_X509,
     };
     let resp = execute_dpe_cmd(
         model,
-        &mut Command::CertifyKey(&certify_key_cmd),
+        &mut Command::CertifyKey((&certify_key_cmd).into()),
         DpeResult::Success,
     );
     let Some(Response::CertifyKey(certify_key_resp)) = resp else {
@@ -414,7 +416,7 @@ pub fn test_all_measurement_apis() {
 
     // Get DPE cert
     let dpe_cert_resp = get_dpe_leaf_cert(&mut hw);
-    let rom_stash_dpe_cert = &dpe_cert_resp.cert[..dpe_cert_resp.cert_size as usize];
+    let rom_stash_dpe_cert = dpe_cert_resp.cert().unwrap();
 
     //
     // 2. RUNTIME STASH MEASUREMENT
@@ -434,7 +436,7 @@ pub fn test_all_measurement_apis() {
 
     // Get DPE cert
     let dpe_cert_resp = get_dpe_leaf_cert(&mut hw);
-    let rt_stash_dpe_cert = &dpe_cert_resp.cert[..dpe_cert_resp.cert_size as usize];
+    let rt_stash_dpe_cert = dpe_cert_resp.cert().unwrap();
 
     //
     // 3. DPE DERIVE CONTEXT
@@ -463,7 +465,7 @@ pub fn test_all_measurement_apis() {
 
     // Get DPE cert
     let dpe_cert_resp = get_dpe_leaf_cert(&mut hw);
-    let derive_context_dpe_cert = &dpe_cert_resp.cert[..dpe_cert_resp.cert_size as usize];
+    let derive_context_dpe_cert = dpe_cert_resp.cert().unwrap();
 
     //
     // COMPARE CERTS

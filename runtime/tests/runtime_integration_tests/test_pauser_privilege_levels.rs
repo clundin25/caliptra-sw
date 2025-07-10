@@ -24,8 +24,8 @@ use caliptra_runtime::{
 
 use dpe::{
     commands::{
-        CertifyKeyCmd, CertifyKeyFlags, Command, DeriveContextCmd, DeriveContextFlags, InitCtxCmd,
-        RotateCtxCmd, RotateCtxFlags,
+        CertifyKeyCommand, CertifyKeyFlags, CertifyKeyP384Cmd, Command, DeriveContextCmd,
+        DeriveContextFlags, InitCtxCmd, RotateCtxCmd, RotateCtxFlags,
     },
     context::ContextHandle,
     response::Response,
@@ -474,15 +474,15 @@ fn test_certify_key_x509_cannot_be_called_from_pl1() {
         m.soc_ifc().cptra_boot_status().read() == u32::from(RtBootStatus::RtReadyForCommands)
     });
 
-    let certify_key_cmd = CertifyKeyCmd {
+    let certify_key_cmd = CertifyKeyP384Cmd {
         handle: ContextHandle::default(),
         label: TEST_LABEL,
         flags: CertifyKeyFlags::empty(),
-        format: CertifyKeyCmd::FORMAT_X509,
+        format: CertifyKeyCommand::FORMAT_X509,
     };
     let resp = execute_dpe_cmd(
         &mut model,
-        &mut Command::CertifyKey(&certify_key_cmd),
+        &mut Command::CertifyKey((&certify_key_cmd).into()),
         DpeResult::MboxCmdFailure(CaliptraError::RUNTIME_INCORRECT_PAUSER_PRIVILEGE_LEVEL),
     );
     assert!(resp.is_none());
@@ -733,15 +733,15 @@ fn test_pl0_unset_in_header() {
     });
 
     // If PL0 PAUSER is unset, make sure PL0-only operation fails
-    let certify_key_cmd = CertifyKeyCmd {
+    let certify_key_cmd = CertifyKeyP384Cmd {
         handle: ContextHandle::default(),
         label: TEST_LABEL,
         flags: CertifyKeyFlags::empty(),
-        format: CertifyKeyCmd::FORMAT_X509,
+        format: CertifyKeyCommand::FORMAT_X509,
     };
     let resp = execute_dpe_cmd(
         &mut model,
-        &mut Command::CertifyKey(&certify_key_cmd),
+        &mut Command::CertifyKey((&certify_key_cmd).into()),
         DpeResult::MboxCmdFailure(CaliptraError::RUNTIME_INCORRECT_PAUSER_PRIVILEGE_LEVEL),
     );
     assert!(resp.is_none());
@@ -778,15 +778,15 @@ fn test_user_not_pl0() {
     });
 
     // If PAUSER is not PL0, make sure PL0-only operation fails
-    let certify_key_cmd = CertifyKeyCmd {
+    let certify_key_cmd = CertifyKeyP384Cmd {
         handle: ContextHandle::default(),
         label: TEST_LABEL,
         flags: CertifyKeyFlags::empty(),
-        format: CertifyKeyCmd::FORMAT_X509,
+        format: CertifyKeyCommand::FORMAT_X509,
     };
     let resp = execute_dpe_cmd(
         &mut model,
-        &mut Command::CertifyKey(&certify_key_cmd),
+        &mut Command::CertifyKey((&certify_key_cmd).into()),
         DpeResult::MboxCmdFailure(CaliptraError::RUNTIME_INCORRECT_PAUSER_PRIVILEGE_LEVEL),
     );
     assert!(resp.is_none());

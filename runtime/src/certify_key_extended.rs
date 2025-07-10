@@ -19,7 +19,7 @@ use caliptra_common::mailbox_api::{
 };
 use caliptra_error::{CaliptraError, CaliptraResult};
 use dpe::{
-    commands::{CertifyKeyCmd, Command, CommandExecution},
+    commands::{CertifyKeyCommand, Command, CommandExecution},
     response::Response,
     DpeInstance,
 };
@@ -85,8 +85,10 @@ impl CertifyKeyExtendedCmd {
             state: &mut pdata.dpe_state,
         };
 
-        let certify_key_cmd = CertifyKeyCmd::ref_from_bytes(&cmd.certify_key_req[..])
-            .map_err(|_| CaliptraError::RUNTIME_DPE_COMMAND_DESERIALIZATION_FAILED)?;
+        let dpe = DpeInstance::initialized();
+        let certify_key_cmd =
+            CertifyKeyCommand::deserialize(dpe.profile, &cmd.certify_key_req[..])
+                .map_err(|_| CaliptraError::RUNTIME_DPE_COMMAND_DESERIALIZATION_FAILED)?;
         let locality = drivers.mbox.user();
         let resp = certify_key_cmd.execute(&mut DpeInstance::initialized(), &mut env, locality);
 
