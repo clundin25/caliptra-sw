@@ -10,30 +10,9 @@ set -x
 
 mkdir -p out
 
-curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-adams-bridge-fix.tar.gz" -o out/system-boot.tar.gz
-# curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-random-mac-attempt-three.tar.gz" -o out/system-boot.tar.gz
-# curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-random-mac.tar.gz" -o out/system-boot.tar.gz
-# curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-kernel-random-mac-with-correct-bitstream.tar.gz" -o out/system-boot.tar.gz
-# curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-kernel-correct-bitstream.tar.gz" -o out/system-boot.tar.gz
-# curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-kernel-with-correct-bitstream.tar.gz" -o out/system-boot.tar.gz
-# curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/vck190-kernel-with-squashfs-fs.tar.gz" -o out/system-boot.tar.gz
-curl -L "https://github.com/clundin25/caliptra-sw/releases/download/release_v20241005_0/io-module.ko" -o out/io-module.ko
-#scp /usr/local/google/home/clundin/vck190-kernel-with-rw-root.tar.gz out/system-boot.tar.gz
-# scp /usr/local/google/home/clundin/vck190-kernel-with-rw-root.gz out/system-boot.tar.gz
-# scp /usr/local/google/home/clundin/vck190-kernel-with-squashfs.gz out/system-boot.tar.gz
-#scp /usr/local/google/home/clundin/vck190-bootfs.tar.gz out/system-boot.tar.gz
-#scp /usr/local/google/home/clundin/vck190-kernel-initrd.tar.gz out/system-boot.tar.gz
+mv /tmp/vck190-kernel.tar.gz out/system-boot.tar.gz
+mv /tmp/io-module.ko out/
 
-# SYSTEM_BOOT_SHA256="5a22eac02deb38825ed5df260e394753f440d546a34b9ed30ac096eb3aed2eb5"
-# if ! (echo "${SYSTEM_BOOT_SHA256} out/system-boot.tar.gz" | sha256sum -c); then
-#   curl -o out/system-boot.tar.gz https://people.canonical.com/~platform/images/xilinx/versal-ubuntu-22.04/iot-limerick-versal-classic-server-2204-x02-20230315-48-system-boot.tar.gz
-#   if ! (echo "${SYSTEM_BOOT_SHA256} out/system-boot.tar.gz" | sha256sum -c); then
-#     echo "Downloaded system-boot file did not match expected sha256sum".
-#     exit 1
-#   fi
-# fi
-
-# export SKIP_DEBOOTSTRAP=1
 # Build the rootfs
 if [[ -z "${SKIP_DEBOOTSTRAP}" ]]; then
   (rm -rf out/rootfs || true)
@@ -98,6 +77,7 @@ chroot out/rootfs systemctl set-default multi-user.target
 chroot out/rootfs chmod 755 /usr/bin/startup-script.sh
 cp startup-script.service out/rootfs/etc/systemd/system/
 chroot out/rootfs systemctl enable startup-script.service
+
 cp out/io-module.ko out/rootfs/home/runner/io-module.ko
 
 (rm -r out/image.img || true)
