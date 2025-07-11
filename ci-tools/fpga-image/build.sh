@@ -141,10 +141,6 @@ mount "${LOOPBACK_DEV}p1" out/bootfs
 # Write bootfs contents
 tar -xvf out/system-boot.tar.gz -C out/bootfs --no-same-owner
 
-# Replace the u-boot boot script with our own
-# rm out/bootfs/boot.scr
-# mkimage -T script -n "boot script" -C none -d boot.scr out/bootfs/boot.scr.uimg
-
 umount out/bootfs
 
 # Format and write the rootfs to the second partition

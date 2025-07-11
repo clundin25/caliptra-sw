@@ -10,8 +10,11 @@ echo 3 > /proc/sys/kernel/printk
 
 mount -o rw,remount /
 
+# TODO(clundin): Get this at job runtime instead.
 insmod /home/runner/io-module.ko
 
+# The VCK-190 image currently always has the same MAC. Do this for now until 
+# a better option is found.
 ip link set dev end0 down
 macchanger -r end0 || true
 ip link set dev end0 up
