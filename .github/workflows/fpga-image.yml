@@ -36,19 +36,17 @@ jobs:
           echo "Starting work"
           sudo mkdir /vck190-tools
           sudo mount UUID=249f0fea-68c1-4e14-af09-5294e50e20b1 /vck190-tools/
-          ls /vck190-tools/
+          ls /vck190-tools/caliptra-bitstreams
 
       - name: Build SD image
         run: |
-          pushd hw/fpga/petalinux_project
-
-          ls /vck190-tools/petalinux-tool/
           source /vck190-tools/petalinux-tool/settings.sh
 
+          pushd hw/fpga/petalinux_project
           petalinux-config --get-hw-description /vck190-tools/caliptra_fpga.xsa --silentconfig
-
           petalinux-build  && petalinux-package --boot --format BIN --plm --psmfw --u-boot --dtb --force
           pushd images/linux
+
           tar -cvf vck190-kernel.tar.gz BOOT.BIN Image image.ub boot.scr system.dts system.dtb
           mv vck190-kernel.tar.gz /tmp/vck190-kernel.tar.gz
           popd
