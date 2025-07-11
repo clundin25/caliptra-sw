@@ -46,8 +46,12 @@ jobs:
           sudo chown $USER:$GROUP /tmp/system.xsa
 
           pushd hw/fpga/petalinux_project
+
           petalinux-config --get-hw-description /tmp/system.xsa --silentconfig
-          petalinux-build  && petalinux-package --boot --format BIN --plm --psmfw --u-boot --dtb --force
+          petalinux-build 
+          dtc -I dtb -O dts -o images/linux/system.dts images/linux/system.dtb
+          petalinux-package --boot --format BIN --plm --psmfw --u-boot --dtb --force
+
           pushd images/linux
 
           tar -cvf vck190-kernel.tar.gz BOOT.BIN Image image.ub boot.scr system.dts system.dtb
