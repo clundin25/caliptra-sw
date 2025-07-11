@@ -8,8 +8,6 @@ on:
 
   push:
     branches: ["main", "carl/vck190-build"]
-    paths:
-      - "ci-tools/fpga-image/**"
 
   schedule:
     # 5:13 AM PST tuesday, thursday
@@ -43,8 +41,11 @@ jobs:
       - name: Build SD image
         run: |
           pushd hw/fpga/petalinux_project
-          petalinux-config --get-hw-description /vck190-tools/caliptra_fpga.xsa --silentconfig
+
+          ls /vck190-tools/petalinux-tool/
           source /vck190-tools/petalinux-tool/settings.sh
+
+          petalinux-config --get-hw-description /vck190-tools/caliptra_fpga.xsa --silentconfig
 
           petalinux-build  && petalinux-package --boot --format BIN --plm --psmfw --u-boot --dtb --force
           pushd images/linux
