@@ -7,7 +7,7 @@ on:
       - "ci-tools/fpga-image/**"
 
   push:
-    branches: ["main"]
+    branches: ["main", "carl/vck190-build"]
     paths:
       - "ci-tools/fpga-image/**"
 
@@ -44,6 +44,8 @@ jobs:
         run: |
           pushd hw/fpga/petalinux_project
           petalinux-config --get-hw-description /vck190-tools/caliptra_fpga.xsa --silentconfig
+          source /vck190-tools/petalinux-tool/settings.sh
+
           petalinux-build  && petalinux-package --boot --format BIN --plm --psmfw --u-boot --dtb --force
           pushd images/linux
           tar -cvf vck190-kernel.tar.gz BOOT.BIN Image image.ub boot.scr system.dts system.dtb
