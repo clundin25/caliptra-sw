@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build_sd_image:
+  build_kernel:
     runs-on: [e2-standard-32, vck190-tools]
     steps:
       - name: Checkout repo
@@ -27,8 +27,6 @@ jobs:
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update
-          sudo apt-get -y install debootstrap binfmt-support qemu-user-static u-boot-tools gcc-aarch64-linux-gnu
-          rustup target add aarch64-unknown-linux-gnu
           sudo apt install gcc libncurses-dev zlib1g:i386 zlib1g-dev net-tools xterm autoconf libtool texinfo gcc-multilib build-essential device-tree-compiler xvfb apt-transport-https ca-certificates gnupg curl -y
 
       - name: Mount FPGA tools
@@ -38,7 +36,7 @@ jobs:
           sudo mount UUID=249f0fea-68c1-4e14-af09-5294e50e20b1 /vck190-tools/
           ls /vck190-tools/caliptra-bitstreams/20250701
 
-      - name: Build SD image
+      - name: Build Kernel
         run: |
           source /vck190-tools/petalinux-tool/settings.sh
 
@@ -61,6 +59,48 @@ jobs:
           IO_MODULE_PATH=$(find . -name 'io-module.ko')
           mv $IO_MODULE_PATH /tmp/io-module.ko
           popd
+
+      - name: 'Upload kernel artifact'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vck190-kernel
+          path: /tmp/vck190-kernel.tar.gz
+          retention-days: 1
+
+      - name: 'Upload kernel module artifact'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vck190-kernel-module
+          path: /tmp/io-module.ko
+          retention-days: 1
+
+  build_sd_image:
+    runs-on: ubuntu-22.04
+    needs: [build_kernel]
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: 'Download kernel artifact'
+        uses: actions/download-artifact@v4
+        with:
+          name: vck190-kernel
+          path: /tmp/vck190-kernel/
+
+      - name: 'Download kernel module artifact'
+        uses: actions/download-artifact@v4
+        with:
+          name: vck190-kernel-module
+          path: /tmp/vck190-kmod/
+
+      - name: Install pre-requisites
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install debootstrap binfmt-support qemu-user-static u-boot-tools gcc-aarch64-linux-gnu
+          rustup target add aarch64-unknown-linux-gnu
+
+      - name: Build SD image
+        run: |
 
           cd ci-tools/fpga-image
           sudo bash build.sh
