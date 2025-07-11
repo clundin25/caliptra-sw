@@ -43,7 +43,7 @@ jobs:
           source /vck190-tools/petalinux-tool/settings.sh
 
           pushd hw/fpga/petalinux_project
-          petalinux-config --get-hw-description /vck190-tools/caliptra-bitstreams/20250701/caliptra_fpga.xsa --silentconfig
+          petalinux-config --get-hw-description /vck190-tools/caliptra-bitstreams/20250701/system.xsa --silentconfig
           petalinux-build  && petalinux-package --boot --format BIN --plm --psmfw --u-boot --dtb --force
           pushd images/linux
 
