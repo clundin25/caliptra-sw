@@ -934,12 +934,11 @@ impl Aes {
     }
 
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
-    pub fn aes_256_ecb_kv(
+    pub fn aes_256_ecb_decrypt_kv(
         &mut self,
         key: AesKey,
-        op: AesOperation,
         input: &[u8],
-        output: KeyId,
+        output: KeyWriteArgs,
     ) -> CaliptraResult<()> {
         if input.is_empty() {
             return Ok(());
@@ -952,18 +951,19 @@ impl Aes {
             self.load_key(key)?;
         }
 
-        self.with_aes(|aes, aes_clp| {
+        cprintln!("Begining KV copy");
+        self.with_aes::<CaliptraResult<()>>(|aes, aes_clp| {
+            wait_for_idle(&aes);
+            KvAccess::begin_copy_to_kv(aes_clp.aes_kv_wr_status(), aes_clp.aes_kv_wr_ctrl(), output)
+        })?;
+
+        self.with_aes(|aes, _| {
             wait_for_idle(&aes);
             for _ in 0..2 {
-                aes_clp.aes_kv_wr_ctrl().write(|w| {
-                    w.write_en(true)
-                        .write_entry(output.into())
-                        .aes_key_dest_valid(true)
-                });
                 aes.ctrl_shadowed().write(|w| {
                     w.key_len(AesKeyLen::_256 as u32)
                         .mode(AesMode::Ecb as u32)
-                        .operation(op as u32)
+                        .operation(AesOperation::Decrypt as u32)
                         .manual_operation(false)
                         .sideload(key.sideload())
                 });
@@ -975,21 +975,28 @@ impl Aes {
             self.load_key(key)?;
         }
 
+        cprintln!("Begun operation");
+
+        cprintln!("Loading blocks");
         for block_num in 0..input.chunks_exact(AES_BLOCK_SIZE_BYTES).len() {
             self.load_data_block(input, block_num)?;
         }
+        cprintln!("Done loading blocks");
 
         self.with_aes(|aes, aes_clp| {
-            wait_for_idle(&aes);
-            while !aes_clp.aes_kv_wr_status().read().ready() {}
-            if aes_clp.aes_kv_wr_status().read().valid() {
-                return Ok(());
-            } else {
-                //TODO Correct error
-                return Err(CaliptraError::DRIVER_AES_READ_KEY_KV_READ);
+            aes.trigger().write(|w| w.start(true));
+            cprintln!("Copying to kv");
+            match KvAccess::end_copy_to_kv(aes_clp.aes_kv_wr_status(), output) {
+                Ok(_) => cprintln!("copyy done okay"),
+                Err(KvAccessErr::KeyRead) => cprintln!("key read fail"),
+                Err(KvAccessErr::KeyWrite) => cprintln!("key write fail"),
+                _ => cprintln!("other fail"),
             }
-        })?;
+        });
 
+        self.zeroize_internal();
+
+        cprintln!("Done AES");
         Ok(())
     }
 

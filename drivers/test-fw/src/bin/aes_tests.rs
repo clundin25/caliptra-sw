@@ -5,7 +5,8 @@
 
 use caliptra_cfi_lib::CfiCounter;
 use caliptra_drivers::{
-    Aes, AesKey, AesOperation, Array4x12, Ecc384, Ecc384PrivKeyOut, Ecc384Scalar, Ecc384Seed, KeyId, KeyReadArgs, KeyUsage, KeyWriteArgs, Trng
+    cprintln, Aes, AesKey, AesOperation, Array4x12, Ecc384, Ecc384PrivKeyOut, Ecc384Scalar,
+    Ecc384Seed, KeyId, KeyReadArgs, KeyUsage, KeyWriteArgs, Trng, Uart,
 };
 use caliptra_registers::aes::AesReg;
 use caliptra_registers::aes_clp::AesClpReg;
@@ -146,9 +147,6 @@ fn test_cmac_kv() {
 
 fn test_aes_kv() {
     // Init CFI
-    let mut entropy_gen = || trng.generate4();
-    CfiCounter::reset(&mut entropy_gen);
-
     let mut trng = unsafe {
         Trng::new(
             CsrngReg::new(),
@@ -159,6 +157,8 @@ fn test_aes_kv() {
         .unwrap()
     };
     let mut aes = unsafe { Aes::new(AesReg::new(), AesClpReg::new()) };
+    let mut entropy_gen = || trng.generate4();
+    CfiCounter::reset(&mut entropy_gen);
 
     const KEY: AesKey<'_> = AesKey::Array(&[0u8; 32]);
     let pt: [u8; 48] = [0u8; 48];
@@ -168,22 +168,21 @@ fn test_aes_kv() {
         0x20, 0x87, 0xdc, 0x95, 0xc0, 0x78, 0xa2, 0x40, 0x89, 0x89, 0xad, 0x48, 0xa2, 0x14, 0x92,
         0x84, 0x20, 0x87,
     ];
-    let mut ecc = unsafe { Ecc384::new(EccReg::new()) };
-    let mut trng = unsafe {
-        Trng::new(
-            CsrngReg::new(),
-            EntropySrcReg::new(),
-            SocIfcTrngReg::new(),
-            &SocIfcReg::new(),
-        )
-        .unwrap()
-    };
     let mut ciphertext: [u8; 48] = [0u8; 48];
-    aes.aes_256_ecb(KEY, AesOperation::Encrypt, &pt[..], &mut ciphertext).unwrap();
+    aes.aes_256_ecb(KEY, AesOperation::Encrypt, &pt[..], &mut ciphertext)
+        .unwrap();
 
     assert_eq!(ciphertext, ct);
     let mut plaintext: [u8; 48] = [0u8; 48];
-    aes.aes_256_ecb(KEY, AesOperation::Decrypt, &ct[..], &mut plaintext).unwrap();
+    Uart::new().write("starting\n");
+    let res = aes.aes_256_ecb_decrypt_kv(
+        KEY,
+        &ct[..],
+        KeyWriteArgs::new(KeyId::KeyId23, KeyUsage::default().set_aes_key_en()),
+    );
+    Uart::new().write("flush\n");
+    res.unwrap();
+
     assert_eq!(plaintext, pt);
 }
 

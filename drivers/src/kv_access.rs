@@ -14,7 +14,7 @@ Abstract:
 --*/
 
 use crate::array::Array4xN;
-use crate::{wait, CaliptraResult, KeyId, KeyUsage, PcrId};
+use crate::{cprintln, wait, CaliptraResult, KeyId, KeyUsage, PcrId};
 use caliptra_registers::enums::KvErrorE;
 use caliptra_registers::regs::{KvReadCtrlRegWriteVal, KvStatusRegReadVal, KvWriteCtrlRegWriteVal};
 use ureg::{Mmio, MmioMut};
@@ -142,6 +142,7 @@ impl KvAccess {
                 .ecc_pkey_dest_valid(key.usage.ecc_private_key())
                 .ecc_seed_dest_valid(key.usage.ecc_key_gen_seed())
                 .aes_key_dest_valid(key.usage.aes_key())
+                .dma_data_dest_valid(key.usage.dma_data())
         });
         Ok(())
     }
@@ -159,7 +160,13 @@ impl KvAccess {
         status_reg: ureg::RegRef<SReg, TMmio>,
         _key: KeyWriteArgs,
     ) -> Result<(), KvAccessErr> {
-        wait::until(|| status_reg.read().valid());
+        let mut i = 0;
+        while !status_reg.read().valid() {
+            if i % 1000000 == 0 {
+                cprintln!("AES STILL NOT READY");
+            }
+            i += 1;
+        }
         match status_reg.read().error() {
             KvErrorE::Success => Ok(()),
             KvErrorE::KvReadFail => Err(KvAccessErr::KeyRead),
