@@ -1923,6 +1923,11 @@ impl CaliptraError {
             "ROM Global Error: FIPS hooks ROM exit"
         ),
         (
+            ROM_OCP_LOCK_HARDWARE_UNSUPPORTED,
+            0x01050010,
+            "ROM Error: Hardware does not support OCP LOCK"
+        ),
+        (
             KAT_SHA256_DIGEST_FAILURE,
             0x90010001,
             "ROM KAT Error: SHA256 digest failure"

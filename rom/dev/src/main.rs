@@ -209,6 +209,11 @@ pub extern "C" fn rom_entry() -> ! {
         }
     }
 
+
+    if let Err(e) = crate::flow::ocp_lock::OcpLockFlow::run(&mut env) {
+        cprintln!("[ROM] OCP LOCK flow failed with 0x{:x}", u32::from(e));
+    }
+
     // Lock the datavault registers.
     lock_registers(&mut env, reset_reason);
 
