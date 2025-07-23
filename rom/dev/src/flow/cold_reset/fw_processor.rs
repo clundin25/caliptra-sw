@@ -167,6 +167,10 @@ impl FirmwareProcessor {
         // Complete the mailbox transaction indicating success.
         txn.complete(true)?;
 
+        if let Err(e) = crate::flow::ocp_lock::OcpLockFlow::run(&mut env.soc_ifc) {
+            cprintln!("[ROM] OCP LOCK flow failed with 0x{:x}", u32::from(e));
+        }
+
         report_boot_status(FwProcessorFirmwareDownloadTxComplete.into());
 
         // Update FW version registers
