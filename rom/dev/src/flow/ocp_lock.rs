@@ -24,10 +24,9 @@ pub struct OcpLockFlow {}
 impl OcpLockFlow {
     #[inline(never)]
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
-    pub fn run(env: &mut RomEnv) -> CaliptraResult<()> {
-        let soc_ifc = &mut env.soc_ifc;
-        let fuse_bank = soc_ifc.fuse_bank();
-        if supports_ocp_lock(soc_ifc) {
+    pub fn run(soc: &mut SocIfc) -> CaliptraResult<()> {
+        let fuse_bank = soc.fuse_bank();
+        if supports_ocp_lock(soc) {
             cprintln!("[ROM] Starting OCP LOCK Flow");
         } else {
             cprintln!("[ROM] OCP LOCK Disabled");
