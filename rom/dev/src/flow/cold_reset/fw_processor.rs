@@ -167,10 +167,6 @@ impl FirmwareProcessor {
         // Complete the mailbox transaction indicating success.
         txn.complete(true)?;
 
-        if let Err(e) = crate::flow::ocp_lock::OcpLockFlow::run(&mut env.soc_ifc) {
-            cprintln!("[ROM] OCP LOCK flow failed with 0x{:x}", u32::from(e));
-        }
-
         report_boot_status(FwProcessorFirmwareDownloadTxComplete.into());
 
         // Update FW version registers
@@ -424,12 +420,17 @@ impl FirmwareProcessor {
                             capabilities |= Capabilities::ROM_OCP_LOCK;
                         }
 
+                        if let Err(e) = crate::flow::ocp_lock::OcpLockFlow::run(soc_ifc) {
+                            cprintln!("[ROM] OCP LOCK flow failed with 0x{:x}", u32::from(e));
+                        }
+
                         let mut resp = CapabilitiesResp {
                             hdr: MailboxRespHeader::default(),
                             capabilities: capabilities.to_bytes(),
                         };
                         resp.populate_chksum();
                         txn.send_response(resp.as_bytes())?;
+
                         continue;
                     }
                     CommandId::ECDSA384_SIGNATURE_VERIFY => {
