@@ -15,7 +15,9 @@ use crate::rom_env::RomEnv;
 #[cfg(not(feature = "no-cfi"))]
 use caliptra_cfi_derive::cfi_impl_fn;
 use caliptra_common::cprintln;
-use caliptra_drivers::{Array4x8, AxiAddr, CaliptraError, CaliptraResult, DmaOtpCtrl, Lifecycle, SocIfc};
+use caliptra_drivers::{
+    Array4x8, AxiAddr, CaliptraError, CaliptraResult, DmaOtpCtrl, Lifecycle, SocIfc,
+};
 
 const ROM_SUPPORTS_OCP_LOCK: bool = true;
 
@@ -30,11 +32,11 @@ impl OcpLockFlow {
             cprintln!("[ROM] Starting OCP LOCK Flow");
         } else {
             cprintln!("[ROM] OCP LOCK Disabled");
-            return Err(CaliptraError::ROM_OCP_LOCK_HARDWARE_UNSUPPORTED)?
+            return Err(CaliptraError::ROM_OCP_LOCK_HARDWARE_UNSUPPORTED)?;
         }
 
         let hek_seed = fuse_bank.ocp_heck_seed();
-        
+
         if hek_seed == Array4x8::default() {
             cprintln!("[ROM] HEK seed is zerozed");
         } else {
