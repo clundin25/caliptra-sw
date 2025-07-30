@@ -27,6 +27,7 @@ impl OcpLockFlow {
     #[inline(never)]
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
     pub fn run(soc: &mut SocIfc) -> CaliptraResult<()> {
+        cprintln!("[ROM] Starting OCP LOCK Flow");
         let fuse_bank = soc.fuse_bank();
         if supports_ocp_lock(soc) {
             cprintln!("[ROM] Starting OCP LOCK Flow");
@@ -35,6 +36,7 @@ impl OcpLockFlow {
             return Err(CaliptraError::ROM_OCP_LOCK_HARDWARE_UNSUPPORTED)?;
         }
 
+        cprintln!("[ROM] OCP LOCK: Checking HEK seed");
         let hek_seed = fuse_bank.ocp_heck_seed();
 
         if hek_seed == Array4x8::default() {
