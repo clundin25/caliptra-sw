@@ -9,6 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Publishes ghcr.io/chipsalliance/caliptra-fpga-cross-compile-image.
   build-and-publish:
     runs-on: ubuntu-latest
     permissions:
