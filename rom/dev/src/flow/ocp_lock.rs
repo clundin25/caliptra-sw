@@ -45,6 +45,9 @@ impl OcpLockFlow {
             cprintln!("[ROM] HEK seed is not zerozed");
         }
 
+        cprintln!("[ROM] OCP LOCK: LOCKING ROM");
+        soc.ocp_lock_set_lock_in_progress();
+
         Ok(())
     }
 }
@@ -60,7 +63,7 @@ impl OcpLockFlow {
 /// # Returns true if OCP lock is supported.
 fn supports_ocp_lock(soc_ifc: &SocIfc) -> bool {
     #[cfg(feature = "ocp-lock")]
-    if soc_ifc.ocp_lock_mode() {
+    if soc_ifc.ocp_lock_enabled() {
         return true;
     }
 

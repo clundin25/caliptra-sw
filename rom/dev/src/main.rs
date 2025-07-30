@@ -142,7 +142,7 @@ pub extern "C" fn rom_entry() -> ! {
     // Start the watchdog timer
     wdt::start_wdt(&mut env.soc_ifc);
 
-    if env.soc_ifc.ocp_lock_mode() {
+    if env.soc_ifc.ocp_lock_enabled() {
         cprintln!("[ROM]: OCP LOCK Enabled");
     } else {
         cprintln!("[ROM]: OCP LOCK Disabled");
