@@ -1217,7 +1217,7 @@ impl FirmwareProcessor {
     /// # Returns true if OCP lock is supported.
     fn supports_ocp_lock(soc_ifc: &SocIfc) -> bool {
         #[cfg(feature = "ocp-lock")]
-        if soc_ifc.ocp_lock_mode() {
+        if soc_ifc.ocp_lock_enabled() {
             return true;
         }
 
