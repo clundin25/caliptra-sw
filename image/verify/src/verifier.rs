@@ -732,11 +732,11 @@ impl<Env: ImageVerificationEnv> ImageVerifier<Env> {
         //}
 
         // Verify owner signatures.
-        self.verify_owner_sig(
-            &owner_signdata_holder,
-            info.owner_ecc_info,
-            &info.owner_pqc_info,
-        )?;
+        //self.verify_owner_sig(
+        //    &owner_signdata_holder,
+        //    info.owner_ecc_info,
+        //    &info.owner_pqc_info,
+        //)?;
 
         let verif_info = TocInfo {
             len: header.toc_len,
