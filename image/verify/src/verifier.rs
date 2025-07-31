@@ -709,34 +709,34 @@ impl<Env: ImageVerificationEnv> ImageVerifier<Env> {
         }
 
         // Verify vendor signatures.
-        //self.verify_vendor_sig(
-        //    &vendor_signdata_holder,
-        //    info.vendor_ecc_info,
-        //    &info.vendor_pqc_info,
-        //)?;
+        self.verify_vendor_sig(
+            &vendor_signdata_holder,
+            info.vendor_ecc_info,
+            &info.vendor_pqc_info,
+        )?;
 
         // Verify the ECC public key index used to verify header signature is encoded
         // in the header
-        //if cfi_launder(header.vendor_ecc_pub_key_idx) != info.vendor_ecc_pub_key_idx {
-        //    Err(CaliptraError::IMAGE_VERIFIER_ERR_VENDOR_ECC_PUB_KEY_INDEX_MISMATCH)?;
-        //} else {
-        //    cfi_assert_eq(header.vendor_ecc_pub_key_idx, info.vendor_ecc_pub_key_idx);
-        //}
+        if cfi_launder(header.vendor_ecc_pub_key_idx) != info.vendor_ecc_pub_key_idx {
+            Err(CaliptraError::IMAGE_VERIFIER_ERR_VENDOR_ECC_PUB_KEY_INDEX_MISMATCH)?;
+        } else {
+            cfi_assert_eq(header.vendor_ecc_pub_key_idx, info.vendor_ecc_pub_key_idx);
+        }
 
         // Verify the PQC (LMS or MLDSA) public key index used to verify header signature is encoded
         // in the header
-        //if cfi_launder(header.vendor_pqc_pub_key_idx) != info.vendor_pqc_pub_key_idx {
-        //    return Err(CaliptraError::IMAGE_VERIFIER_ERR_VENDOR_PQC_PUB_KEY_INDEX_MISMATCH);
-        //} else {
-        //    cfi_assert_eq(header.vendor_pqc_pub_key_idx, info.vendor_pqc_pub_key_idx);
-        //}
+        if cfi_launder(header.vendor_pqc_pub_key_idx) != info.vendor_pqc_pub_key_idx {
+            return Err(CaliptraError::IMAGE_VERIFIER_ERR_VENDOR_PQC_PUB_KEY_INDEX_MISMATCH);
+        } else {
+            cfi_assert_eq(header.vendor_pqc_pub_key_idx, info.vendor_pqc_pub_key_idx);
+        }
 
         // Verify owner signatures.
-        //self.verify_owner_sig(
-        //    &owner_signdata_holder,
-        //    info.owner_ecc_info,
-        //    &info.owner_pqc_info,
-        //)?;
+        self.verify_owner_sig(
+            &owner_signdata_holder,
+            info.owner_ecc_info,
+            &info.owner_pqc_info,
+        )?;
 
         let verif_info = TocInfo {
             len: header.toc_len,
