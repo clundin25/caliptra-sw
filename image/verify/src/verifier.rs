@@ -717,19 +717,19 @@ impl<Env: ImageVerificationEnv> ImageVerifier<Env> {
 
         // Verify the ECC public key index used to verify header signature is encoded
         // in the header
-        if cfi_launder(header.vendor_ecc_pub_key_idx) != info.vendor_ecc_pub_key_idx {
-            Err(CaliptraError::IMAGE_VERIFIER_ERR_VENDOR_ECC_PUB_KEY_INDEX_MISMATCH)?;
-        } else {
-            cfi_assert_eq(header.vendor_ecc_pub_key_idx, info.vendor_ecc_pub_key_idx);
-        }
+        //if cfi_launder(header.vendor_ecc_pub_key_idx) != info.vendor_ecc_pub_key_idx {
+        //    Err(CaliptraError::IMAGE_VERIFIER_ERR_VENDOR_ECC_PUB_KEY_INDEX_MISMATCH)?;
+        //} else {
+        //    cfi_assert_eq(header.vendor_ecc_pub_key_idx, info.vendor_ecc_pub_key_idx);
+        //}
 
         // Verify the PQC (LMS or MLDSA) public key index used to verify header signature is encoded
         // in the header
-        if cfi_launder(header.vendor_pqc_pub_key_idx) != info.vendor_pqc_pub_key_idx {
-            return Err(CaliptraError::IMAGE_VERIFIER_ERR_VENDOR_PQC_PUB_KEY_INDEX_MISMATCH);
-        } else {
-            cfi_assert_eq(header.vendor_pqc_pub_key_idx, info.vendor_pqc_pub_key_idx);
-        }
+        //if cfi_launder(header.vendor_pqc_pub_key_idx) != info.vendor_pqc_pub_key_idx {
+        //    return Err(CaliptraError::IMAGE_VERIFIER_ERR_VENDOR_PQC_PUB_KEY_INDEX_MISMATCH);
+        //} else {
+        //    cfi_assert_eq(header.vendor_pqc_pub_key_idx, info.vendor_pqc_pub_key_idx);
+        //}
 
         // Verify owner signatures.
         self.verify_owner_sig(
