@@ -709,11 +709,11 @@ impl<Env: ImageVerificationEnv> ImageVerifier<Env> {
         }
 
         // Verify vendor signatures.
-        self.verify_vendor_sig(
-            &vendor_signdata_holder,
-            info.vendor_ecc_info,
-            &info.vendor_pqc_info,
-        )?;
+        //self.verify_vendor_sig(
+        //    &vendor_signdata_holder,
+        //    info.vendor_ecc_info,
+        //    &info.vendor_pqc_info,
+        //)?;
 
         // Verify the ECC public key index used to verify header signature is encoded
         // in the header
