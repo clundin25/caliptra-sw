@@ -59,8 +59,11 @@ impl OcpLockFlow {
         populate_slot(hmac, trng, KEY_ID_OCP_LOCK_HEK)?;
         populate_slot(hmac, trng, KEY_ID_OCP_LOCK_MDK)?;
 
+        check_aes_decrypt_mdk_to_fw(aes, trng)?;
         check_hmac_ocp_kv_to_ocp_kv_lock_mode(hmac, trng)?;
-        check_hmac_regular_kv_to_ocp_kv_lock_mode(hmac, trng)?;
+
+        // TODO: This flow is not yet supported in HW.
+        //check_hmac_regular_kv_to_ocp_kv_lock_mode(hmac, trng)?;
 
         Ok(())
     }
