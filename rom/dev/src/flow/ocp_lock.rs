@@ -14,9 +14,13 @@ Abstract:
 use crate::rom_env::RomEnv;
 #[cfg(not(feature = "no-cfi"))]
 use caliptra_cfi_derive::cfi_impl_fn;
-use caliptra_common::cprintln;
+use caliptra_common::{
+    cprintln,
+    keyids::{KEY_ID_OCP_LOCK_HEK, KEY_ID_OCP_LOCK_MDK, KEY_ID_TMP},
+};
 use caliptra_drivers::{
-    Array4x8, AxiAddr, CaliptraError, CaliptraResult, DmaOtpCtrl, Lifecycle, SocIfc,
+    Array4x8, AxiAddr, CaliptraError, CaliptraResult, DmaOtpCtrl, Hmac, HmacData, HmacKey,
+    HmacMode, HmacTag, KeyReadArgs, KeyUsage, KeyWriteArgs, Lifecycle, SocIfc, Trng,
 };
 
 const ROM_SUPPORTS_OCP_LOCK: bool = true;
@@ -26,13 +30,11 @@ pub struct OcpLockFlow {}
 impl OcpLockFlow {
     #[inline(never)]
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
-    pub fn run(soc: &mut SocIfc) -> CaliptraResult<()> {
+    pub fn run(soc: &mut SocIfc, hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
         cprintln!("[ROM] Starting OCP LOCK Flow");
         let fuse_bank = soc.fuse_bank();
         if supports_ocp_lock(soc) {
-            cprintln!("[ROM] Starting OCP LOCK Flow");
         } else {
-            cprintln!("[ROM] OCP LOCK Disabled");
             return Err(CaliptraError::ROM_OCP_LOCK_HARDWARE_UNSUPPORTED)?;
         }
 
@@ -48,7 +50,31 @@ impl OcpLockFlow {
         cprintln!("[ROM] OCP LOCK: LOCKING ROM");
         soc.ocp_lock_set_lock_in_progress();
 
+        check_hmac_after_lock_mode(hmac, trng)?;
+
         Ok(())
+    }
+}
+
+fn check_hmac_after_lock_mode(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
+    cprintln!("[ROM] Checking HMAC after LOCK mode enabled");
+    // Assertion:
+    // After ROM enables LOCK mode, it should still be possible to do HMAC(key=HEK, dest=LOCK_KV)
+    //
+    let res = hmac.hmac(
+        HmacKey::Key(KeyReadArgs::new(KEY_ID_OCP_LOCK_MDK)),
+        HmacData::Key(KeyReadArgs::new(KEY_ID_TMP)),
+        trng,
+        HmacTag::Key(KeyWriteArgs::new(KEY_ID_OCP_LOCK_HEK, KeyUsage::default())),
+        HmacMode::Hmac512,
+    );
+
+    match res {
+        Ok(res) => Ok(res),
+        Err(e) => {
+            cprintln!("[ROM] check_hmac_after_lock_mode FAILED");
+            Err(e)
+        }
     }
 }
 
@@ -64,8 +90,10 @@ impl OcpLockFlow {
 fn supports_ocp_lock(soc_ifc: &SocIfc) -> bool {
     #[cfg(feature = "ocp-lock")]
     if soc_ifc.ocp_lock_enabled() {
+        cprintln!("[ROM] OCP LOCK supported in hardware and enabled in ROM");
         return true;
     }
 
+    cprintln!("[ROM] OCP LOCK Disabled");
     false
 }

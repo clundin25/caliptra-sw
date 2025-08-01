@@ -420,7 +420,11 @@ impl FirmwareProcessor {
                             capabilities |= Capabilities::ROM_OCP_LOCK;
                         }
 
-                        if let Err(e) = crate::flow::ocp_lock::OcpLockFlow::run(soc_ifc) {
+                        if let Err(e) = crate::flow::ocp_lock::OcpLockFlow::run(
+                            soc_ifc,
+                            &mut env.hmac,
+                            &mut env.trng,
+                        ) {
                             cprintln!("[ROM] OCP LOCK flow failed with 0x{:x}", u32::from(e));
                         }
 
