@@ -16,7 +16,7 @@ use crate::rom_env::RomEnv;
 use caliptra_cfi_derive::cfi_impl_fn;
 use caliptra_common::{
     cprintln,
-    keyids::{KEY_ID_OCP_LOCK_HEK, KEY_ID_OCP_LOCK_MDK, KEY_ID_TMP},
+    keyids::{KEY_ID_OCP_LOCK_HEK, KEY_ID_OCP_LOCK_MDK, KEY_ID_ROM_FMC_CDI, KEY_ID_TMP},
 };
 use caliptra_drivers::{
     Array4x16, Array4x8, AxiAddr, CaliptraError, CaliptraResult, DmaOtpCtrl, Hmac, HmacData,
@@ -51,7 +51,8 @@ impl OcpLockFlow {
         soc.ocp_lock_set_lock_in_progress();
 
         populate_hek(hmac, trng)?;
-        check_hmac_after_lock_mode(hmac, trng)?;
+        check_hmac_ocp_kv_to_ocp_kv_lock_mode(hmac, trng)?;
+        check_hmac_regular_kv_to_ocp_kv_lock_mode(hmac, trng)?;
 
         Ok(())
     }
@@ -73,8 +74,8 @@ fn populate_hek(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
     )
 }
 
-fn check_hmac_after_lock_mode(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
-    cprintln!("[ROM] Checking HMAC after LOCK mode enabled");
+fn check_hmac_ocp_kv_to_ocp_kv_lock_mode(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
+    cprintln!("[ROM] Checking OCP to OCP KV HMAC after LOCK mode enabled");
     // Assertion:
     // After ROM enables LOCK mode, it should still be possible to do HMAC(key=HEK, dest=LOCK_KV)
     let res = hmac.hmac(
@@ -86,10 +87,40 @@ fn check_hmac_after_lock_mode(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResul
     );
 
     match res {
-        Ok(res) => Ok(res),
+        Ok(res) => {
+            cprintln!("[ROM] check_hmac_ocp_kv_to_ocp_kv_lock_mode PASSED");
+            Ok(res)
+        }
         Err(e) => {
-            cprintln!("[ROM] check_hmac_after_lock_mode FAILED");
+            cprintln!("[ROM] check_hmac_ocp_kv_to_ocp_kv_lock_mode FAILED");
             Err(e)
+        }
+    }
+}
+
+fn check_hmac_regular_kv_to_ocp_kv_lock_mode(
+    hmac: &mut Hmac,
+    trng: &mut Trng,
+) -> CaliptraResult<()> {
+    cprintln!("[ROM] Checking Regular to OCP KV HMAC after LOCK mode enabled");
+    // Assertion:
+    // After ROM enables LOCK mode, it should still be possible to do HMAC(key=HEK, dest=LOCK_KV)
+    let res = hmac.hmac(
+        HmacKey::Key(KeyReadArgs::new(KEY_ID_ROM_FMC_CDI)),
+        HmacData::Slice(&[0; 32]),
+        trng,
+        HmacTag::Key(KeyWriteArgs::new(KEY_ID_OCP_LOCK_MDK, KeyUsage::default())),
+        HmacMode::Hmac512,
+    );
+
+    match res {
+        Ok(res) => {
+            cprintln!("[ROM] check_hmac_regular_kv_to_ocp_kv_lock_mode FAILED");
+            Err(CaliptraError::RUNTIME_INTERNAL)
+        }
+        Err(e) => {
+            cprintln!("[ROM] check_hmac_regular_kv_to_ocp_kv_lock_mode PASSED");
+            Ok(())
         }
     }
 }
