@@ -46,7 +46,7 @@ impl OcpLockFlow {
         }
 
         cprintln!("[ROM] OCP LOCK: LOCKING ROM");
-        //soc.ocp_lock_set_lock_in_progress();
+        soc.ocp_lock_set_lock_in_progress();
 
         Ok(())
     }
