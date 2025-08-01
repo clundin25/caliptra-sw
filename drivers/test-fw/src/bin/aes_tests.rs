@@ -5,8 +5,7 @@
 
 use caliptra_cfi_lib::CfiCounter;
 use caliptra_drivers::{
-    Aes, AesKey, Array4x12, Ecc384, Ecc384PrivKeyOut, Ecc384Scalar, Ecc384Seed, KeyId, KeyReadArgs,
-    KeyUsage, KeyWriteArgs, Trng,
+    Aes, AesKey, AesOperation, Array4x12, Ecc384, Ecc384PrivKeyOut, Ecc384Scalar, Ecc384Seed, KeyId, KeyReadArgs, KeyUsage, KeyWriteArgs, Trng
 };
 use caliptra_registers::aes::AesReg;
 use caliptra_registers::aes_clp::AesClpReg;
@@ -145,7 +144,36 @@ fn test_cmac_kv() {
     assert_eq!(mac1, mac2, "AES CMAC mismatch");
 }
 
+fn test_aes_kv() {
+    let mut aes = unsafe { Aes::new(AesReg::new(), AesClpReg::new()) };
+
+    const KEY: AesKey<'_> = AesKey::Array(&[0u8; 32]);
+    let pt: [u8; 48] = [0u8; 48];
+    let ct: [u8; 48] = [
+        0xdc, 0x95, 0xc0, 0x78, 0xa2, 0x40, 0x89, 0x89, 0xad, 0x48, 0xa2, 0x14, 0x92, 0x84, 0x20,
+        0x87, 0xdc, 0x95, 0xc0, 0x78, 0xa2, 0x40, 0x89, 0x89, 0xad, 0x48, 0xa2, 0x14, 0x92, 0x84,
+        0x20, 0x87, 0xdc, 0x95, 0xc0, 0x78, 0xa2, 0x40, 0x89, 0x89, 0xad, 0x48, 0xa2, 0x14, 0x92,
+        0x84, 0x20, 0x87,
+    ];
+    let mut ecc = unsafe { Ecc384::new(EccReg::new()) };
+    let mut trng = unsafe {
+        Trng::new(
+            CsrngReg::new(),
+            EntropySrcReg::new(),
+            SocIfcTrngReg::new(),
+            &SocIfcReg::new(),
+        )
+        .unwrap()
+    };
+    let mut ciphertext: [u8; 48] = [0u8; 48];
+    aes.aes_256_ecb(KEY, AesOperation::Encrypt, &pt[..], &mut ciphertext).unwrap();
+
+    assert_eq!(ciphertext, ct);
+    let mut plaintext: [u8; 48] = [0u8; 48];
+    aes.aes_256_ecb(KEY, AesOperation::Decrypt, &ct[..], &mut plaintext).unwrap();
+    assert_eq!(plaintext, pt);
+}
+
 test_suite! {
-    test_cmac,
-    test_cmac_kv,
+    test_aes_kv,
 }

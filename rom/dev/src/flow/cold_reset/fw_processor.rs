@@ -19,6 +19,7 @@ use crate::key_ladder;
 use crate::pcr;
 use crate::rom_env::RomEnv;
 use crate::run_fips_tests;
+use caliptra_api::mailbox::TestOcpLockResp;
 use caliptra_api::mailbox::{
     CmDeriveStableKeyReq, CmDeriveStableKeyResp, CmHmacReq, CmHmacResp, CmKeyUsage,
     CmRandomGenerateReq, CmRandomGenerateResp, CmStableKeyType, InstallOwnerPkHashReq,
@@ -409,6 +410,25 @@ impl FirmwareProcessor {
                         // Causing a ROM Fatal Error will zeroize the module
                         return Err(CaliptraError::RUNTIME_SHUTDOWN);
                     }
+                    CommandId::TEST_OCP_LOCK => {
+                        let mut request = MailboxReqHeader::default();
+                        Self::copy_req_verify_chksum(&mut txn, request.as_mut_bytes(), false)?;
+                        if let Err(e) = crate::flow::ocp_lock::OcpLockFlow::run(
+                            soc_ifc,
+                            &mut env.hmac,
+                            &mut env.trng,
+                            &mut env.aes,
+                        ) {
+                            cprintln!("[ROM] OCP LOCK flow failed with 0x{:x}", u32::from(e));
+                        }
+
+                        let mut resp = TestOcpLockResp {
+                            hdr: MailboxRespHeader::default(),
+                        };
+                        resp.populate_chksum();
+                        txn.send_response(resp.as_bytes())?;
+                        continue;
+                    }
                     CommandId::CAPABILITIES => {
                         let mut request = MailboxReqHeader::default();
                         Self::copy_req_verify_chksum(&mut txn, request.as_mut_bytes(), false)?;
@@ -418,14 +438,6 @@ impl FirmwareProcessor {
 
                         if Self::supports_ocp_lock(&soc_ifc) {
                             capabilities |= Capabilities::ROM_OCP_LOCK;
-                        }
-
-                        if let Err(e) = crate::flow::ocp_lock::OcpLockFlow::run(
-                            soc_ifc,
-                            &mut env.hmac,
-                            &mut env.trng,
-                        ) {
-                            cprintln!("[ROM] OCP LOCK flow failed with 0x{:x}", u32::from(e));
                         }
 
                         let mut resp = CapabilitiesResp {

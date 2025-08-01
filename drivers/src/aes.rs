@@ -19,12 +19,15 @@ Abstract:
 --*/
 
 use crate::{
-    kv_access::KvAccess, CaliptraError, CaliptraResult, KeyReadArgs, LEArray4x4, LEArray4x8, Trng,
+    kv_access::KvAccess, CaliptraError, CaliptraResult, KeyReadArgs, LEArray4x4, LEArray4x8, Trng, KeyId,
 };
 use caliptra_api::mailbox::CmAesMode;
 #[cfg(not(feature = "no-cfi"))]
 use caliptra_cfi_derive::cfi_impl_fn;
-use caliptra_registers::{aes::AesReg, aes_clp::AesClpReg};
+use caliptra_registers::{
+    aes::AesReg,
+    aes_clp::{self, AesClpReg},
+};
 use core::cmp::Ordering;
 use zerocopy::{transmute, FromBytes, Immutable, IntoBytes, KnownLayout};
 
@@ -927,6 +930,66 @@ impl Aes {
                 self.read_data_block(output, i)?;
             }
         }
+        Ok(())
+    }
+
+    #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
+    pub fn aes_256_ecb_kv(
+        &mut self,
+        key: AesKey,
+        op: AesOperation,
+        input: &[u8],
+        output: KeyId,
+    ) -> CaliptraResult<()> {
+        if input.is_empty() {
+            return Ok(());
+        }
+        if input.len() % AES_BLOCK_SIZE_BYTES != 0 {
+            Err(CaliptraError::RUNTIME_DRIVER_AES_INVALID_SLICE)?;
+        }
+
+        if key.sideload() {
+            self.load_key(key)?;
+        }
+
+        self.with_aes(|aes, aes_clp| {
+            wait_for_idle(&aes);
+            for _ in 0..2 {
+                aes_clp.aes_kv_wr_ctrl().write(|w| {
+                    w.write_en(true)
+                        .write_entry(output.into())
+                        .aes_key_dest_valid(true)
+                });
+                aes.ctrl_shadowed().write(|w| {
+                    w.key_len(AesKeyLen::_256 as u32)
+                        .mode(AesMode::Ecb as u32)
+                        .operation(op as u32)
+                        .manual_operation(false)
+                        .sideload(key.sideload())
+                });
+            }
+            wait_for_idle(&aes);
+        });
+
+        if !key.sideload() {
+            self.load_key(key)?;
+        }
+
+        for block_num in 0..input.chunks_exact(AES_BLOCK_SIZE_BYTES).len() {
+            self.load_data_block(input, block_num)?;
+        }
+
+        self.with_aes(|aes, aes_clp| {
+            wait_for_idle(&aes);
+            while !aes_clp.aes_kv_wr_status().read().ready() {}
+            if aes_clp.aes_kv_wr_status().read().valid() {
+                return Ok(());
+            } else {
+                //TODO Correct error
+                return Err(CaliptraError::DRIVER_AES_READ_KEY_KV_READ);
+            }
+        })?;
+
         Ok(())
     }
 
