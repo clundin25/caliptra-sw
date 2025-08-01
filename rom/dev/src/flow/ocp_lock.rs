@@ -19,8 +19,8 @@ use caliptra_common::{
     keyids::{KEY_ID_OCP_LOCK_HEK, KEY_ID_OCP_LOCK_MDK, KEY_ID_TMP},
 };
 use caliptra_drivers::{
-    Array4x8, AxiAddr, CaliptraError, CaliptraResult, DmaOtpCtrl, Hmac, HmacData, HmacKey,
-    HmacMode, HmacTag, KeyReadArgs, KeyUsage, KeyWriteArgs, Lifecycle, SocIfc, Trng,
+    Array4x16, Array4x8, AxiAddr, CaliptraError, CaliptraResult, DmaOtpCtrl, Hmac, HmacData,
+    HmacKey, HmacMode, HmacTag, KeyReadArgs, KeyUsage, KeyWriteArgs, Lifecycle, SocIfc, Trng,
 };
 
 const ROM_SUPPORTS_OCP_LOCK: bool = true;
@@ -50,22 +50,38 @@ impl OcpLockFlow {
         cprintln!("[ROM] OCP LOCK: LOCKING ROM");
         soc.ocp_lock_set_lock_in_progress();
 
+        populate_hek(hmac, trng)?;
         check_hmac_after_lock_mode(hmac, trng)?;
 
         Ok(())
     }
 }
 
+/// Populate HEK slot with garbage for testing.
+fn populate_hek(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
+    cprintln!("[ROM] OCP LOCK filling HEK with garbage");
+    hmac.hmac(
+        HmacKey::Array4x16(&Array4x16::default()),
+        HmacData::from(&[0]),
+        trng,
+        KeyWriteArgs::new(
+            KEY_ID_OCP_LOCK_HEK,
+            KeyUsage::default().set_hmac_key_en().set_aes_key_en(),
+        )
+        .into(),
+        HmacMode::Hmac512,
+    )
+}
+
 fn check_hmac_after_lock_mode(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
     cprintln!("[ROM] Checking HMAC after LOCK mode enabled");
     // Assertion:
     // After ROM enables LOCK mode, it should still be possible to do HMAC(key=HEK, dest=LOCK_KV)
-    //
     let res = hmac.hmac(
-        HmacKey::Key(KeyReadArgs::new(KEY_ID_OCP_LOCK_MDK)),
-        HmacData::Key(KeyReadArgs::new(KEY_ID_TMP)),
+        HmacKey::Key(KeyReadArgs::new(KEY_ID_OCP_LOCK_HEK)),
+        HmacData::Slice(&[0; 32]),
         trng,
-        HmacTag::Key(KeyWriteArgs::new(KEY_ID_OCP_LOCK_HEK, KeyUsage::default())),
+        HmacTag::Key(KeyWriteArgs::new(KEY_ID_OCP_LOCK_MDK, KeyUsage::default())),
         HmacMode::Hmac512,
     );
 
