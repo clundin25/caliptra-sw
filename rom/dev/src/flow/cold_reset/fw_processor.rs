@@ -424,6 +424,7 @@ impl FirmwareProcessor {
                             soc_ifc,
                             &mut env.hmac,
                             &mut env.trng,
+                            &mut env.aes,
                         ) {
                             cprintln!("[ROM] OCP LOCK flow failed with 0x{:x}", u32::from(e));
                         }

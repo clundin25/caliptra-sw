@@ -19,8 +19,9 @@ use caliptra_common::{
     keyids::{KEY_ID_OCP_LOCK_HEK, KEY_ID_OCP_LOCK_MDK, KEY_ID_ROM_FMC_CDI, KEY_ID_TMP},
 };
 use caliptra_drivers::{
-    Array4x16, Array4x8, AxiAddr, CaliptraError, CaliptraResult, DmaOtpCtrl, Hmac, HmacData,
-    HmacKey, HmacMode, HmacTag, KeyReadArgs, KeyUsage, KeyWriteArgs, Lifecycle, SocIfc, Trng,
+    Aes, AesKey, AesOperation, Array4x16, Array4x8, AxiAddr, CaliptraError, CaliptraResult,
+    DmaOtpCtrl, Hmac, HmacData, HmacKey, HmacMode, HmacTag, KeyId, KeyReadArgs, KeyUsage,
+    KeyWriteArgs, Lifecycle, SocIfc, Trng,
 };
 
 const ROM_SUPPORTS_OCP_LOCK: bool = true;
@@ -30,7 +31,12 @@ pub struct OcpLockFlow {}
 impl OcpLockFlow {
     #[inline(never)]
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
-    pub fn run(soc: &mut SocIfc, hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
+    pub fn run(
+        soc: &mut SocIfc,
+        hmac: &mut Hmac,
+        trng: &mut Trng,
+        aes: &mut Aes,
+    ) -> CaliptraResult<()> {
         cprintln!("[ROM] Starting OCP LOCK Flow");
         let fuse_bank = soc.fuse_bank();
         if supports_ocp_lock(soc) {
@@ -50,7 +56,9 @@ impl OcpLockFlow {
         cprintln!("[ROM] OCP LOCK: LOCKING ROM");
         soc.ocp_lock_set_lock_in_progress();
 
-        populate_hek(hmac, trng)?;
+        populate_slot(hmac, trng, KEY_ID_OCP_LOCK_HEK)?;
+        populate_slot(hmac, trng, KEY_ID_OCP_LOCK_MDK)?;
+
         check_hmac_ocp_kv_to_ocp_kv_lock_mode(hmac, trng)?;
         check_hmac_regular_kv_to_ocp_kv_lock_mode(hmac, trng)?;
 
@@ -58,20 +66,39 @@ impl OcpLockFlow {
     }
 }
 
-/// Populate HEK slot with garbage for testing.
-fn populate_hek(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
+/// Populate slot with garbage for testing.
+fn populate_slot(hmac: &mut Hmac, trng: &mut Trng, slot: KeyId) -> CaliptraResult<()> {
     cprintln!("[ROM] OCP LOCK filling HEK with garbage");
     hmac.hmac(
         HmacKey::Array4x16(&Array4x16::default()),
         HmacData::from(&[0]),
         trng,
-        KeyWriteArgs::new(
-            KEY_ID_OCP_LOCK_HEK,
-            KeyUsage::default().set_hmac_key_en().set_aes_key_en(),
-        )
-        .into(),
+        KeyWriteArgs::new(slot, KeyUsage::default().set_hmac_key_en().set_aes_key_en()).into(),
         HmacMode::Hmac512,
     )
+}
+
+fn check_aes_decrypt_mdk_to_fw(aes: &mut Aes, trng: &mut Trng) -> CaliptraResult<()> {
+    cprintln!("[ROM] Checking AES-256-ECB decrypt from MDK to FW");
+    // Assertion:
+    let mut output = [0; 16];
+    let res = aes.aes_256_ecb(
+        AesKey::KV(KeyReadArgs::new(KEY_ID_OCP_LOCK_MDK)),
+        AesOperation::Decrypt,
+        &[0; 16],
+        &mut output,
+    );
+
+    match res {
+        Ok(res) => {
+            cprintln!("[ROM] check_aes_decrypt_mdk_to_fw PASSED");
+            Ok(res)
+        }
+        Err(e) => {
+            cprintln!("[ROM] check_aes_decrypt_mdk_to_fw FAILED");
+            Err(e)
+        }
+    }
 }
 
 fn check_hmac_ocp_kv_to_ocp_kv_lock_mode(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
