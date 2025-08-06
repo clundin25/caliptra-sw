@@ -5,8 +5,7 @@
 
 use caliptra_cfi_lib::CfiCounter;
 use caliptra_drivers::{
-    Aes, AesKey, Array4x12, Ecc384, Ecc384PrivKeyOut, Ecc384Scalar, Ecc384Seed, KeyId, KeyReadArgs,
-    KeyUsage, KeyWriteArgs, Trng,
+    Aes, AesKey, AesOperation, Array4x12, Ecc384, Ecc384PrivKeyOut, Ecc384Scalar, Ecc384Seed, KeyId, KeyReadArgs, KeyUsage, KeyWriteArgs, Trng
 };
 use caliptra_registers::aes::AesReg;
 use caliptra_registers::aes_clp::AesClpReg;
@@ -144,6 +143,8 @@ fn test_cmac_kv() {
 }
 
 fn test_aes_kv() {
+    let mut aes = unsafe { Aes::new(AesReg::new(), AesClpReg::new()) };
+
     const KEY: AesKey<'_> = AesKey::Array(&[0u8; 32]);
     let pt: [u8; 48] = [0u8; 48];
     let ct: [u8; 48] = [
@@ -163,17 +164,12 @@ fn test_aes_kv() {
         .unwrap()
     };
     let mut ciphertext: [u8; 48] = [0u8; 48];
-    aes.aes_256_ecb(KEY, AesOperation::Encrypt, &pt[..], &mut ciphertext)?;
+    aes.aes_256_ecb(KEY, AesOperation::Encrypt, &pt[..], &mut ciphertext).unwrap();
 
-    if ciphertext != ct {
-        Err(CaliptraError::KAT_AES_CIPHERTEXT_MISMATCH)?;
-    }
-
+    assert_eq!(ciphertext, ct);
     let mut plaintext: [u8; 48] = [0u8; 48];
-    aes.aes_256_ecb(KEY, AesOperation::Decrypt, &ct[..], &mut plaintext)?;
-    if plaintext != pt {
-        Err(CaliptraError::KAT_AES_PLAINTEXT_MISMATCH)?;
-    }
+    aes.aes_256_ecb(KEY, AesOperation::Decrypt, &ct[..], &mut plaintext).unwrap();
+    assert_eq!(plaintext, pt);
 }
 
 test_suite! {
