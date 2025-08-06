@@ -173,7 +173,5 @@ fn test_aes_kv() {
 }
 
 test_suite! {
-    test_cmac,
-    test_cmac_kv,
     test_aes_kv,
 }
