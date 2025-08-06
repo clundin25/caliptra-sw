@@ -123,15 +123,18 @@ pub fn start_rt_test_pqc_model(
             CodeRange::new(RUNTIME_ORG, RUNTIME_ORG + RUNTIME_SIZE),
         ),
     ];
-    let rom = caliptra_builder::rom_for_fw_integration_tests().unwrap();
+    let rom;
     let init_params = match args.init_params {
         Some(init_params) => init_params,
-        None => InitParams {
-            rom: &rom,
-            stack_info: Some(StackInfo::new(image_info)),
-            test_sram: args.test_sram,
-            ..Default::default()
-        },
+        None => {
+            rom = caliptra_builder::rom_for_fw_integration_tests().unwrap();
+            InitParams {
+                rom: &rom,
+                stack_info: Some(StackInfo::new(image_info)),
+                test_sram: args.test_sram,
+                ..Default::default()
+            }
+        }
     };
 
     let image =
