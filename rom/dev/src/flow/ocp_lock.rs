@@ -83,8 +83,11 @@ fn check_hek_seed(fuse_bank: &FuseBank) -> CaliptraResult<()> {
     Ok(())
 }
 
-
-fn check_populate_mek_with_aes(aes: &mut Aes, hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
+fn check_populate_mek_with_aes(
+    aes: &mut Aes,
+    hmac: &mut Hmac,
+    trng: &mut Trng,
+) -> CaliptraResult<()> {
     cprintln!("[ROM] check_populate_mek_with_aes");
     populate_slot(hmac, trng, KEY_ID_OCP_LOCK_MDK)?;
 
@@ -94,7 +97,7 @@ fn check_populate_mek_with_aes(aes: &mut Aes, hmac: &mut Hmac, trng: &mut Trng) 
     //    &[0; 16],
     //    &mut output,
     //);
-    
+
     Ok(())
 }
 

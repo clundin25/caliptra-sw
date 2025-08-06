@@ -143,7 +143,41 @@ fn test_cmac_kv() {
     assert_eq!(mac1, mac2, "AES CMAC mismatch");
 }
 
+fn test_aes_kv() {
+    const KEY: AesKey<'_> = AesKey::Array(&[0u8; 32]);
+    let pt: [u8; 48] = [0u8; 48];
+    let ct: [u8; 48] = [
+        0xdc, 0x95, 0xc0, 0x78, 0xa2, 0x40, 0x89, 0x89, 0xad, 0x48, 0xa2, 0x14, 0x92, 0x84, 0x20,
+        0x87, 0xdc, 0x95, 0xc0, 0x78, 0xa2, 0x40, 0x89, 0x89, 0xad, 0x48, 0xa2, 0x14, 0x92, 0x84,
+        0x20, 0x87, 0xdc, 0x95, 0xc0, 0x78, 0xa2, 0x40, 0x89, 0x89, 0xad, 0x48, 0xa2, 0x14, 0x92,
+        0x84, 0x20, 0x87,
+    ];
+    let mut ecc = unsafe { Ecc384::new(EccReg::new()) };
+    let mut trng = unsafe {
+        Trng::new(
+            CsrngReg::new(),
+            EntropySrcReg::new(),
+            SocIfcTrngReg::new(),
+            &SocIfcReg::new(),
+        )
+        .unwrap()
+    };
+    let mut ciphertext: [u8; 48] = [0u8; 48];
+    aes.aes_256_ecb(KEY, AesOperation::Encrypt, &pt[..], &mut ciphertext)?;
+
+    if ciphertext != ct {
+        Err(CaliptraError::KAT_AES_CIPHERTEXT_MISMATCH)?;
+    }
+
+    let mut plaintext: [u8; 48] = [0u8; 48];
+    aes.aes_256_ecb(KEY, AesOperation::Decrypt, &ct[..], &mut plaintext)?;
+    if plaintext != pt {
+        Err(CaliptraError::KAT_AES_PLAINTEXT_MISMATCH)?;
+    }
+}
+
 test_suite! {
     test_cmac,
     test_cmac_kv,
+    test_aes_kv,
 }
