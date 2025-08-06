@@ -145,6 +145,10 @@ fn test_cmac_kv() {
 }
 
 fn test_aes_kv() {
+    // Init CFI
+    let mut entropy_gen = || trng.generate4();
+    CfiCounter::reset(&mut entropy_gen);
+
     let mut aes = unsafe { Aes::new(AesReg::new(), AesClpReg::new()) };
 
     const KEY: AesKey<'_> = AesKey::Array(&[0u8; 32]);
