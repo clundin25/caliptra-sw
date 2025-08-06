@@ -169,7 +169,7 @@ impl CommandId {
     pub const CM_ECDSA_SIGN: Self = Self(0x434D_4553); // "CMES"
     pub const CM_ECDSA_VERIFY: Self = Self(0x434D_4556); // "CMEV"
     pub const CM_DERIVE_STABLE_KEY: Self = Self(0x494D_4453); // "CMDS"
-                                                              
+
     /// Temporary Test command to validate OCP LOCK hardware.
     pub const TEST_OCP_LOCK: Self = Self(0x504D_4453);
 }

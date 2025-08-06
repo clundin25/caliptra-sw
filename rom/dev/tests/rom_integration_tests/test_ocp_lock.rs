@@ -1,6 +1,8 @@
 // Licensed under the Apache-2.0 license
 
-use caliptra_api::mailbox::{CapabilitiesResp, CommandId, MailboxReqHeader, MailboxRespHeader, TestOcpLockResp};
+use caliptra_api::mailbox::{
+    CapabilitiesResp, CommandId, MailboxReqHeader, MailboxRespHeader, TestOcpLockResp,
+};
 use caliptra_api::Capabilities;
 use caliptra_builder::firmware::ROM_WITH_UART_OCP_LOCK;
 use caliptra_hw_model::HwModel;

@@ -20,7 +20,7 @@ use caliptra_common::{
 };
 use caliptra_drivers::{
     Aes, AesKey, AesOperation, Array4x16, Array4x8, AxiAddr, CaliptraError, CaliptraResult,
-    DmaOtpCtrl, Hmac, HmacData, HmacKey, HmacMode, HmacTag, KeyId, KeyReadArgs, KeyUsage,
+    DmaOtpCtrl, FuseBank, Hmac, HmacData, HmacKey, HmacMode, HmacTag, KeyId, KeyReadArgs, KeyUsage,
     KeyWriteArgs, Lifecycle, SocIfc, Trng,
 };
 
@@ -38,35 +38,64 @@ impl OcpLockFlow {
         aes: &mut Aes,
     ) -> CaliptraResult<()> {
         cprintln!("[ROM] Starting OCP LOCK Flow");
-        let fuse_bank = soc.fuse_bank();
-        if supports_ocp_lock(soc) {
-        } else {
+        if !supports_ocp_lock(soc) {
             return Err(CaliptraError::ROM_OCP_LOCK_HARDWARE_UNSUPPORTED)?;
         }
-
-        cprintln!("[ROM] OCP LOCK: Checking HEK seed");
-        let hek_seed = fuse_bank.ocp_heck_seed();
-
-        if hek_seed == Array4x8::default() {
-            cprintln!("[ROM] HEK seed is zerozed");
-        } else {
-            cprintln!("[ROM] HEK seed is not zerozed");
-        }
-
-        cprintln!("[ROM] OCP LOCK: LOCKING ROM");
-        soc.ocp_lock_set_lock_in_progress();
-
-        populate_slot(hmac, trng, KEY_ID_OCP_LOCK_HEK)?;
-        populate_slot(hmac, trng, KEY_ID_OCP_LOCK_MDK)?;
-
-        check_aes_decrypt_mdk_to_fw(aes, trng)?;
-        check_hmac_ocp_kv_to_ocp_kv_lock_mode(hmac, trng)?;
-
-        // TODO: This flow is not yet supported in HW.
-        //check_hmac_regular_kv_to_ocp_kv_lock_mode(hmac, trng)?;
-
+        validation_flow(soc, hmac, trng, aes)?;
         Ok(())
     }
+}
+
+//populate_slot(hmac, trng, KEY_ID_OCP_LOCK_HEK)?;
+//
+//check_aes_decrypt_mdk_to_fw(aes, trng)?;
+//check_hmac_ocp_kv_to_ocp_kv_lock_mode(hmac, trng)?;
+
+// TODO: This flow is not yet supported in HW.
+//check_hmac_regular_kv_to_ocp_kv_lock_mode(hmac, trng)?;
+
+fn validation_flow(
+    soc: &mut SocIfc,
+    hmac: &mut Hmac,
+    trng: &mut Trng,
+    aes: &mut Aes,
+) -> CaliptraResult<()> {
+    cprintln!("[ROM] Starting OCP LOCK Validation");
+    let fuse_bank = soc.fuse_bank();
+
+    check_hek_seed(&fuse_bank)?;
+    check_populate_mek_with_aes(aes, hmac, trng);
+
+    cprintln!("[ROM] OCP LOCK: LOCKING ROM");
+    soc.ocp_lock_set_lock_in_progress();
+    Ok(())
+}
+
+fn check_hek_seed(fuse_bank: &FuseBank) -> CaliptraResult<()> {
+    cprintln!("[ROM] OCP LOCK: Checking HEK seed");
+    let hek_seed = fuse_bank.ocp_heck_seed();
+
+    if hek_seed == Array4x8::default() {
+        cprintln!("[ROM] HEK seed is zerozed");
+    } else {
+        cprintln!("[ROM] HEK seed is not zerozed");
+    }
+    Ok(())
+}
+
+
+fn check_populate_mek_with_aes(aes: &mut Aes, hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
+    cprintln!("[ROM] check_populate_mek_with_aes");
+    populate_slot(hmac, trng, KEY_ID_OCP_LOCK_MDK)?;
+
+    //let res = aes.aes_256_ecb(
+    //    AesKey::KV(KeyReadArgs::new(KEY_ID_OCP_LOCK_MDK)),
+    //    AesOperation::Decrypt,
+    //    &[0; 16],
+    //    &mut output,
+    //);
+    
+    Ok(())
 }
 
 /// Populate slot with garbage for testing.
