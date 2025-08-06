@@ -149,6 +149,15 @@ fn test_aes_kv() {
     let mut entropy_gen = || trng.generate4();
     CfiCounter::reset(&mut entropy_gen);
 
+    let mut trng = unsafe {
+        Trng::new(
+            CsrngReg::new(),
+            EntropySrcReg::new(),
+            SocIfcTrngReg::new(),
+            &SocIfcReg::new(),
+        )
+        .unwrap()
+    };
     let mut aes = unsafe { Aes::new(AesReg::new(), AesClpReg::new()) };
 
     const KEY: AesKey<'_> = AesKey::Array(&[0u8; 32]);
