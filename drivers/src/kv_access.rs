@@ -161,7 +161,7 @@ impl KvAccess {
     ) -> Result<(), KvAccessErr> {
         let mut i = 0;
         while !status_reg.read().valid() {
-            if i % 100000 == 0 {
+            if i % 1000000 == 0 {
                 cprintln!("AES STILL NOT READY");
             }
             i += 1;
