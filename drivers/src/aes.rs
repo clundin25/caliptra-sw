@@ -1015,6 +1015,7 @@ impl Aes {
         cprintln!("Done loading blocks");
 
         self.with_aes(|aes, aes_clp| {
+            aes.trigger().write(|w| w.start(true));
             cprintln!("Copying to kv");
             match KvAccess::end_copy_to_kv(aes_clp.aes_kv_wr_status(), output) {
                 Ok(_) => cprintln!("copyy done okay"),
@@ -1023,6 +1024,8 @@ impl Aes {
                 _ => cprintln!("other fail"),
             }
         });
+
+        self.zeroize_internal();
 
         cprintln!("Done AES");
         Ok(())
