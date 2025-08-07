@@ -1014,6 +1014,7 @@ impl Aes {
             self.load_data_block(input, block_num)?;
         }
 
+        wait_for_idle(&aes);
         cprintln!("Done AES");
         Ok(())
     }
