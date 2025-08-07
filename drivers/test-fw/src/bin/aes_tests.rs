@@ -180,7 +180,7 @@ fn test_aes_kv() {
     );
     Uart::new().write("flush\n");
     res.unwrap();
-    
+
     assert_eq!(plaintext, pt);
 }
 

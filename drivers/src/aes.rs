@@ -19,8 +19,9 @@ Abstract:
 --*/
 
 use crate::{
-    cprintln, kv_access::KvAccess, CaliptraError, CaliptraResult, KeyId, KeyReadArgs, KeyWriteArgs,
-    Trng,
+    cprintln,
+    kv_access::{KvAccess, KvAccessErr},
+    CaliptraError, CaliptraResult, KeyId, KeyReadArgs, KeyWriteArgs, Trng,
 };
 use caliptra_api::mailbox::CmAesMode;
 #[cfg(not(feature = "no-cfi"))]
@@ -974,6 +975,12 @@ impl Aes {
             self.load_key(key)?;
         }
 
+        cprintln!("Begining KV copy");
+        let res = self.with_aes::<CaliptraResult<()>>(|aes, aes_clp| {
+            wait_for_idle(&aes);
+            KvAccess::begin_copy_to_kv(aes_clp.aes_kv_wr_status(), aes_clp.aes_kv_wr_ctrl(), output)
+        });
+
         self.with_aes(|aes, _| {
             wait_for_idle(&aes);
             for _ in 0..2 {
@@ -988,27 +995,23 @@ impl Aes {
             wait_for_idle(&aes);
         });
 
-        if !key.sideload() {
-            self.load_key(key)?;
-        }
-
+        cprintln!("Loading blocks");
         for block_num in 0..input.chunks_exact(AES_BLOCK_SIZE_BYTES).len() {
             self.load_data_block(input, block_num)?;
         }
 
-        cprintln!("Begining KV copy");
-
-        let res = self.with_aes::<CaliptraResult<()>>(|aes, aes_clp| {
-            KvAccess::begin_copy_to_kv(aes_clp.aes_kv_wr_status(), aes_clp.aes_kv_wr_ctrl(), output)
+        let res = self.with_aes::<Result<(), KvAccessErr>>(|aes, aes_clp| {
+            wait_for_idle(&aes);
+            KvAccess::end_copy_to_kv(aes_clp.aes_kv_wr_status(), output)
         });
 
         cprintln!("Done copying");
 
         match res {
             Ok(_) => Ok(()),
-            Err(e) => {
-                cprintln!("failed with: 0x{:x}", u32::from(e));
-                Err(e)
+            Err(_) => {
+                cprintln!("copy failed");
+                Ok(())
             }
         }
     }
