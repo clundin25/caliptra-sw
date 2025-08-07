@@ -19,7 +19,8 @@ Abstract:
 --*/
 
 use crate::{
-    kv_access::KvAccess, CaliptraError, CaliptraResult, KeyId, KeyReadArgs, KeyWriteArgs, Trng,
+    cprintln, kv_access::KvAccess, CaliptraError, CaliptraResult, KeyId, KeyReadArgs, KeyWriteArgs,
+    Trng,
 };
 use caliptra_api::mailbox::CmAesMode;
 #[cfg(not(feature = "no-cfi"))]
@@ -995,17 +996,20 @@ impl Aes {
             self.load_data_block(input, block_num)?;
         }
 
-        self.with_aes::<CaliptraResult<()>>(|aes, aes_clp| {
-            wait_for_idle(&aes);
-            KvAccess::begin_copy_to_kv(
-                aes_clp.aes_kv_wr_status(),
-                aes_clp.aes_kv_wr_ctrl(),
-                output,
-            )?;
-            Ok(())
-        })?;
+        cprintln!("Begining KV copy");
 
-        Ok(())
+        let res = self.with_aes::<CaliptraResult<()>>(|aes, aes_clp| {
+            wait_for_idle(&aes);
+            KvAccess::begin_copy_to_kv(aes_clp.aes_kv_wr_status(), aes_clp.aes_kv_wr_ctrl(), output)
+        });
+
+        match res {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                cprintln!("failed with: 0x{:x}", u32::from(e));
+                Err(e)
+            }
+        }
     }
 
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]

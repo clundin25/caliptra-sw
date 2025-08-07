@@ -5,8 +5,8 @@
 
 use caliptra_cfi_lib::CfiCounter;
 use caliptra_drivers::{
-    Aes, AesKey, AesOperation, Array4x12, Ecc384, Ecc384PrivKeyOut, Ecc384Scalar, Ecc384Seed,
-    KeyId, KeyReadArgs, KeyUsage, KeyWriteArgs, Trng,
+    cprintln, Aes, AesKey, AesOperation, Array4x12, Ecc384, Ecc384PrivKeyOut, Ecc384Scalar,
+    Ecc384Seed, KeyId, KeyReadArgs, KeyUsage, KeyWriteArgs, Trng, Uart,
 };
 use caliptra_registers::aes::AesReg;
 use caliptra_registers::aes_clp::AesClpReg;
@@ -172,6 +172,7 @@ fn test_aes_kv() {
 
     assert_eq!(ciphertext, ct);
     let mut plaintext: [u8; 48] = [0u8; 48];
+    Uart::new().write("starting\n");
     aes.aes_256_ecb_decrypt_kv(
         KEY,
         &ct[..],
