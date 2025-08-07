@@ -174,7 +174,6 @@ fn test_aes_kv() {
     let mut plaintext: [u8; 48] = [0u8; 48];
     aes.aes_256_ecb_decrypt_kv(
         KEY,
-        AesOperation::Decrypt,
         &ct[..],
         KeyWriteArgs::new(KeyId::KeyId23, KeyUsage::default().set_aes_key_en()),
     )
