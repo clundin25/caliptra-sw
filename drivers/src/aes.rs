@@ -1002,6 +1002,10 @@ impl Aes {
             wait_for_idle(&aes);
         });
 
+        if !key.sideload() {
+            self.load_key(key)?;
+        }
+
         cprintln!("Begun operation");
 
         
