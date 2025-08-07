@@ -999,7 +999,6 @@ impl Aes {
         cprintln!("Begining KV copy");
 
         let res = self.with_aes::<CaliptraResult<()>>(|aes, aes_clp| {
-            wait_for_idle(&aes);
             KvAccess::begin_copy_to_kv(aes_clp.aes_kv_wr_status(), aes_clp.aes_kv_wr_ctrl(), output)
         });
 
