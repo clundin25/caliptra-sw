@@ -901,9 +901,10 @@ impl Aes {
 
         let mut i = 0;
         while !aes.status().read().input_ready() {
-            if i % 100000 {
+            if i % 100000 == 0 {
                 cprintln!("AES STILL NOT READY");
             }
+            i += 1;
         }
 
         let len = data.len();
