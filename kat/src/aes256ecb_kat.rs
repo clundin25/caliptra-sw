@@ -13,7 +13,7 @@ Abstract:
 --*/
 
 use caliptra_drivers::{
-    Aes, AesKey, AesOperation, CaliptraError, CaliptraResult, KeyId, KeyUsage, KeyWriteArgs,
+    Aes, AesKey, AesOperation, Array4x12, CaliptraError, CaliptraResult, Hmac, HmacMode, KeyId, KeyUsage, KeyWriteArgs, Trng
 };
 
 // Generated from Python code:
@@ -47,13 +47,25 @@ impl Aes256EcbKat {
     /// # Returns
     ///
     /// * `CaliptraResult` - Result denoting the KAT outcome.
-    pub fn execute(&self, aes: &mut Aes) -> CaliptraResult<()> {
-        self.encrypt_decrypt(aes)
-    }
+    pub fn execute(&self, aes: &mut Aes, trng: &mut Trng, hmac: &mut Hmac) -> CaliptraResult<()> {
+        self.encrypt_decrypt(aes, trng, hmac)
 
-    fn encrypt_decrypt(&self, aes: &mut Aes) -> CaliptraResult<()> {
+    }
+    fn encrypt_decrypt(&self, aes: &mut Aes, trng: &mut Trng, hmac: &mut Hmac) -> CaliptraResult<()> {
         let mut ciphertext: [u8; 48] = [0u8; 48];
         aes.aes_256_ecb(KEY, AesOperation::Encrypt, &PT[..], &mut ciphertext)?;
+
+        hmac.hmac(
+            caliptra_drivers::HmacKey::Array4x12(&Array4x12::default()),
+            caliptra_drivers::HmacData::Slice(&[]),
+            trng,
+            caliptra_drivers::HmacTag::Key(KeyWriteArgs::new(
+                KeyId::KeyId16,
+                KeyUsage::default().set_aes_key_en().set_hmac_key_en(),
+            )),
+            HmacMode::Hmac512,
+        );
+
 
         if ciphertext != CT {
             Err(CaliptraError::KAT_AES_CIPHERTEXT_MISMATCH)?;
@@ -63,7 +75,7 @@ impl Aes256EcbKat {
         let key_write_args =
             KeyWriteArgs::new(KeyId::KeyId23, KeyUsage::default().set_aes_key_en());
 
-        aes.aes_256_ecb_decrypt_kv(KEY, &CT[..], key_write_args)?;
+        aes.aes_256_ecb_decrypt_kv(AesKey::Kv(key_write_args), &CT[..], key_write_args)?;
         if plaintext != PT {
             Err(CaliptraError::KAT_AES_PLAINTEXT_MISMATCH)?;
         }

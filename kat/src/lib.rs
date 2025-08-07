@@ -110,7 +110,7 @@ pub fn execute_kat(env: &mut KatsEnv) -> CaliptraResult<()> {
     Mldsa87Kat::default().execute(env.mldsa87, env.trng)?;
 
     cprintln!("[kat] AES-256-ECB");
-    Aes256EcbKat::default().execute(env.aes)?;
+    Aes256EcbKat::default().execute(env.aes, env.trng, env.hmac)?;
 
     cprintln!("[kat] AES-256-CBC");
     Aes256CbcKat::default().execute(env.aes)?;
