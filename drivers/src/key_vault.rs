@@ -122,11 +122,17 @@ bitfield! {
 
     /// Flag indicating if the key can be used as AES key
     pub aes_key, set_aes_key: 5;
+
+    pub dma_data, set_dma_data: 6;
 }
 
 impl KeyUsage {
     pub fn set_hmac_key_en(&mut self) -> KeyUsage {
         self.set_hmac_key(true);
+        *self
+    }
+    pub fn set_dma_data_en(&mut self) -> KeyUsage {
+        self.set_dma_data(true);
         *self
     }
     pub fn set_hmac_data_en(&mut self) -> KeyUsage {

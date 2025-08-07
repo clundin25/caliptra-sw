@@ -55,6 +55,7 @@ impl Aes256EcbKat {
         let mut ciphertext: [u8; 48] = [0u8; 48];
         aes.aes_256_ecb(KEY, AesOperation::Encrypt, &PT[..], &mut ciphertext)?;
 
+        // 1. Fill Key Slot 16 w/
         hmac.hmac(
             caliptra_drivers::HmacKey::Array4x12(&Array4x12::default()),
             caliptra_drivers::HmacData::Slice(&[]),
@@ -75,7 +76,7 @@ impl Aes256EcbKat {
         let key_read_args =
             KeyReadArgs::new(KeyId::KeyId16);
         let key_write_args =
-            KeyWriteArgs::new(KeyId::KeyId23, KeyUsage::default().set_aes_key_en());
+            KeyWriteArgs::new(KeyId::KeyId23, KeyUsage::default().set_aes_key_en().set_dma_data_en().set_hmac_data_en());
 
         aes.aes_256_ecb_decrypt_kv(AesKey::KV(key_read_args), &CT[..32], key_write_args)?;
         if plaintext != PT {
