@@ -13,8 +13,7 @@ Abstract:
 --*/
 
 use caliptra_drivers::{
-    Aes, AesKey, AesOperation, Array4x12, CaliptraError, CaliptraResult, Hmac, HmacMode, KeyId,
-    KeyReadArgs, KeyUsage, KeyWriteArgs, Trng,
+    Aes, AesKey, AesOperation, CaliptraError, CaliptraResult, KeyId, KeyUsage, KeyWriteArgs,
 };
 
 // Generated from Python code:
@@ -48,16 +47,11 @@ impl Aes256EcbKat {
     /// # Returns
     ///
     /// * `CaliptraResult` - Result denoting the KAT outcome.
-    pub fn execute(&self, aes: &mut Aes, hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
-        self.encrypt_decrypt(aes, hmac, trng)
+    pub fn execute(&self, aes: &mut Aes) -> CaliptraResult<()> {
+        self.encrypt_decrypt(aes)
     }
 
-    fn encrypt_decrypt(
-        &self,
-        aes: &mut Aes,
-        hmac: &mut Hmac,
-        trng: &mut Trng,
-    ) -> CaliptraResult<()> {
+    fn encrypt_decrypt(&self, aes: &mut Aes) -> CaliptraResult<()> {
         let mut ciphertext: [u8; 48] = [0u8; 48];
         aes.aes_256_ecb(KEY, AesOperation::Encrypt, &PT[..], &mut ciphertext)?;
 
@@ -65,26 +59,11 @@ impl Aes256EcbKat {
             Err(CaliptraError::KAT_AES_CIPHERTEXT_MISMATCH)?;
         }
 
-        hmac.hmac(
-            caliptra_drivers::HmacKey::Array4x12(&Array4x12::default()),
-            caliptra_drivers::HmacData::Slice(&[]),
-            trng,
-            caliptra_drivers::HmacTag::Key(KeyWriteArgs::new(
-                KeyId::KeyId16,
-                KeyUsage::default().set_aes_key_en().set_hmac_key_en(),
-            )),
-            HmacMode::Hmac512,
-        );
-
         let mut plaintext: [u8; 48] = [0u8; 48];
         let key_write_args =
             KeyWriteArgs::new(KeyId::KeyId23, KeyUsage::default().set_aes_key_en());
 
-        aes.aes_256_ecb_decrypt_kv(
-            AesKey::KV(KeyReadArgs::new(KeyId::KeyId16)),
-            &CT[..],
-            key_write_args,
-        )?;
+        aes.aes_256_ecb_decrypt_kv(KEY, &CT[..], key_write_args)?;
         if plaintext != PT {
             Err(CaliptraError::KAT_AES_PLAINTEXT_MISMATCH)?;
         }
