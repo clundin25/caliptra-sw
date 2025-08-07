@@ -13,7 +13,7 @@ Abstract:
 --*/
 
 use caliptra_drivers::{
-    Aes, AesKey, AesOperation, Array4x12, CaliptraError, CaliptraResult, Hmac, HmacMode, KeyId, KeyUsage, KeyWriteArgs, Trng
+    Aes, AesKey, AesOperation, Array4x12, CaliptraError, CaliptraResult, Hmac, HmacMode, KeyId, KeyReadArgs, KeyUsage, KeyWriteArgs, Trng
 };
 
 // Generated from Python code:
@@ -72,10 +72,12 @@ impl Aes256EcbKat {
         }
 
         let mut plaintext: [u8; 48] = [0u8; 48];
+        let key_read_args =
+            KeyReadArgs::new(KeyId::KeyId16);
         let key_write_args =
             KeyWriteArgs::new(KeyId::KeyId23, KeyUsage::default().set_aes_key_en());
 
-        aes.aes_256_ecb_decrypt_kv(AesKey::Kv(key_write_args), &CT[..], key_write_args)?;
+        aes.aes_256_ecb_decrypt_kv(AesKey::KV(key_read_args), &CT[..], key_write_args)?;
         if plaintext != PT {
             Err(CaliptraError::KAT_AES_PLAINTEXT_MISMATCH)?;
         }
