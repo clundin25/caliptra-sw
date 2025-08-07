@@ -898,7 +898,13 @@ impl Aes {
         }
         let data = &data[block_num * AES_BLOCK_SIZE_BYTES..];
         let data = &data[..AES_BLOCK_SIZE_BYTES.min(data.len())];
-        while !aes.status().read().input_ready() {}
+
+        let mut i = 0;
+        while !aes.status().read().input_ready() {
+            if i % 100000 {
+                cprintln!("AES STILL NOT READY");
+            }
+        }
 
         let len = data.len();
         let mut padded_data = [0u8; AES_BLOCK_SIZE_BYTES];
@@ -1000,7 +1006,7 @@ impl Aes {
         
         cprintln!("Loading blocks");
         for block_num in 0..input.chunks_exact(AES_BLOCK_SIZE_BYTES).len() {
-            // self.load_data_block(input, block_num)?;
+            self.load_data_block(input, block_num)?;
         }
 
 
