@@ -981,39 +981,41 @@ impl Aes {
             KvAccess::begin_copy_to_kv(aes_clp.aes_kv_wr_status(), aes_clp.aes_kv_wr_ctrl(), output)
         });
 
-        self.with_aes(|aes, _| {
-            wait_for_idle(&aes);
-            for _ in 0..2 {
-                aes.ctrl_shadowed().write(|w| {
-                    w.key_len(AesKeyLen::_256 as u32)
-                        .mode(AesMode::Ecb as u32)
-                        .operation(AesOperation::Decrypt as u32)
-                        .manual_operation(false)
-                        .sideload(key.sideload())
-                });
-            }
-            wait_for_idle(&aes);
-        });
+        Ok(())
 
-        cprintln!("Loading blocks");
-        for block_num in 0..input.chunks_exact(AES_BLOCK_SIZE_BYTES).len() {
-            self.load_data_block(input, block_num)?;
-        }
-
-        let res = self.with_aes::<Result<(), KvAccessErr>>(|aes, aes_clp| {
-            wait_for_idle(&aes);
-            KvAccess::end_copy_to_kv(aes_clp.aes_kv_wr_status(), output)
-        });
-
-        cprintln!("Done copying");
-
-        match res {
-            Ok(_) => Ok(()),
-            Err(_) => {
-                cprintln!("copy failed");
-                Ok(())
-            }
-        }
+        // self.with_aes(|aes, _| {
+        //     wait_for_idle(&aes);
+        //     for _ in 0..2 {
+        //         aes.ctrl_shadowed().write(|w| {
+        //             w.key_len(AesKeyLen::_256 as u32)
+        //                 .mode(AesMode::Ecb as u32)
+        //                 .operation(AesOperation::Decrypt as u32)
+        //                 .manual_operation(false)
+        //                 .sideload(key.sideload())
+        //         });
+        //     }
+        //     wait_for_idle(&aes);
+        // });
+        //
+        // cprintln!("Loading blocks");
+        // for block_num in 0..input.chunks_exact(AES_BLOCK_SIZE_BYTES).len() {
+        //     self.load_data_block(input, block_num)?;
+        // }
+        //
+        // let res = self.with_aes::<Result<(), KvAccessErr>>(|aes, aes_clp| {
+        //     wait_for_idle(&aes);
+        //     KvAccess::end_copy_to_kv(aes_clp.aes_kv_wr_status(), output)
+        // });
+        //
+        // cprintln!("Done copying");
+        //
+        // match res {
+        //     Ok(_) => Ok(()),
+        //     Err(_) => {
+        //         cprintln!("copy failed");
+        //         Ok(())
+        //     }
+        // }
     }
 
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
