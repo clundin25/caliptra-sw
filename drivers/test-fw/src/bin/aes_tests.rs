@@ -173,7 +173,7 @@ fn test_aes_kv() {
 
     assert_eq!(ciphertext, ct);
     let mut plaintext: [u8; 48] = [0u8; 48];
-    aes.aes_256_ecb(KEY, AesOperation::Decrypt, &ct[..], &mut plaintext)
+    aes.aes_256_ecb_decrypt_kv(KEY, AesOperation::Decrypt, &ct[..], KeyId::KeyId23)
         .unwrap();
     assert_eq!(plaintext, pt);
 }

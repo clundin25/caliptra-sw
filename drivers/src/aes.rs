@@ -18,7 +18,7 @@ Abstract:
 
 --*/
 
-use crate::{kv_access::KvAccess, CaliptraError, CaliptraResult, KeyId, KeyReadArgs, Trng};
+use crate::{kv_access::KvAccess, CaliptraError, CaliptraResult, KeyId, KeyReadArgs, KeyWriteArgs, Trng};
 use caliptra_api::mailbox::CmAesMode;
 #[cfg(not(feature = "no-cfi"))]
 use caliptra_cfi_derive::cfi_impl_fn;
@@ -954,12 +954,11 @@ impl Aes {
     }
 
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
-    pub fn aes_256_ecb_kv(
+    pub fn aes_256_ecb_decrypt_kv(
         &mut self,
         key: AesKey,
-        op: AesOperation,
         input: &[u8],
-        output: KeyId,
+        output: KeyWriteArgs,
     ) -> CaliptraResult<()> {
         if input.is_empty() {
             return Ok(());
@@ -972,18 +971,13 @@ impl Aes {
             self.load_key(key)?;
         }
 
-        self.with_aes(|aes, aes_clp| {
+        self.with_aes(|aes, _| {
             wait_for_idle(&aes);
             for _ in 0..2 {
-                aes_clp.aes_kv_wr_ctrl().write(|w| {
-                    w.write_en(true)
-                        .write_entry(output.into())
-                        .aes_key_dest_valid(true)
-                });
                 aes.ctrl_shadowed().write(|w| {
                     w.key_len(AesKeyLen::_256 as u32)
                         .mode(AesMode::Ecb as u32)
-                        .operation(op as u32)
+                        .operation(AesOperation::Decrypt as u32)
                         .manual_operation(false)
                         .sideload(key.sideload())
                 });
@@ -999,15 +993,14 @@ impl Aes {
             self.load_data_block(input, block_num)?;
         }
 
-        self.with_aes(|aes, aes_clp| {
+        self.with_aes::<CaliptraResult<()>>(|aes, aes_clp| {
             wait_for_idle(&aes);
-            while !aes_clp.aes_kv_wr_status().read().ready() {}
-            if aes_clp.aes_kv_wr_status().read().valid() {
-                return Ok(());
-            } else {
-                //TODO Correct error
-                return Err(CaliptraError::DRIVER_AES_READ_KEY_KV_READ);
-            }
+            KvAccess::begin_copy_to_kv(
+                aes_clp.aes_kv_wr_status(),
+                aes_clp.aes_kv_wr_ctrl(),
+                output,
+            )?;
+            Ok(())
         })?;
 
         Ok(())
