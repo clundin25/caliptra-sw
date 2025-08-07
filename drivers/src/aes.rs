@@ -1013,8 +1013,6 @@ impl Aes {
             self.load_data_block(input, block_num)?;
         }
 
-        self.zeroize_internal();
-
         self.with_aes(|aes, aes_clp| {
             wait_for_idle(&aes);
             match KvAccess::end_copy_to_kv(aes_clp.aes_kv_wr_status(), output) {
@@ -1024,6 +1022,8 @@ impl Aes {
                 _ => cprintln!("other fail"),
             }
         });
+
+        self.zeroize_internal();
 
         cprintln!("Done AES");
         Ok(())
