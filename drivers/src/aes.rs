@@ -997,14 +997,14 @@ impl Aes {
 
         cprintln!("Begun operation");
 
+        
+        cprintln!("Loading blocks");
+        for block_num in 0..input.chunks_exact(AES_BLOCK_SIZE_BYTES).len() {
+            self.load_data_block(input, block_num)?;
+        }
+
         Ok(())
 
-        
-        // cprintln!("Loading blocks");
-        // for block_num in 0..input.chunks_exact(AES_BLOCK_SIZE_BYTES).len() {
-        //     self.load_data_block(input, block_num)?;
-        // }
-        //
         // let res = self.with_aes::<Result<(), KvAccessErr>>(|aes, aes_clp| {
         //     wait_for_idle(&aes);
         //     KvAccess::end_copy_to_kv(aes_clp.aes_kv_wr_status(), output)
