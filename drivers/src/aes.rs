@@ -1015,9 +1015,6 @@ impl Aes {
         cprintln!("Done loading blocks");
 
         self.with_aes(|aes, aes_clp| {
-            cprintln!("Waiting for idle");
-            wait_for_idle(&aes);
-            cprintln!("Done waiting for idle");
             cprintln!("Copying to kv");
             match KvAccess::end_copy_to_kv(aes_clp.aes_kv_wr_status(), output) {
                 Ok(_) => cprintln!("copyy done okay"),
