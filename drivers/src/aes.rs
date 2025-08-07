@@ -1014,21 +1014,8 @@ impl Aes {
             self.load_data_block(input, block_num)?;
         }
 
-
-        let res = self.with_aes::<Result<(), KvAccessErr>>(|aes, aes_clp| {
-            wait_for_idle(&aes);
-            KvAccess::end_copy_to_kv(aes_clp.aes_kv_wr_status(), output)
-        });
-
-        cprintln!("Done copying");
-
-        match res {
-            Ok(_) => Ok(()),
-            Err(_) => {
-                cprintln!("copy failed");
-                Ok(())
-            }
-        }
+        cprintln!("Done AES");
+        Ok(())
     }
 
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
