@@ -1008,13 +1008,21 @@ impl Aes {
 
         cprintln!("Begun operation");
 
-        
         cprintln!("Loading blocks");
         for block_num in 0..input.chunks_exact(AES_BLOCK_SIZE_BYTES).len() {
             self.load_data_block(input, block_num)?;
         }
 
-        wait_for_idle(&aes);
+        self.with_aes(|aes, aes_clp| {
+            wait_for_idle(&aes);
+            match KvAccess::end_copy_to_kv(aes_clp.aes_kv_wr_status(), output) {
+                Ok(_) => cprintln!("copyy done okay"),
+                Err(KvAccessErr::KeyRead) => cprintln!("key read fail"),
+                Err(KvAccessErr::KeyWrite) => cprintln!("key write fail"),
+                _ => cprintln!("other fail"),
+            }
+        });
+
         cprintln!("Done AES");
         Ok(())
     }

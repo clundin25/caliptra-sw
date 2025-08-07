@@ -62,6 +62,7 @@ impl Aes256EcbKat {
         let mut plaintext: [u8; 48] = [0u8; 48];
         let key_write_args =
             KeyWriteArgs::new(KeyId::KeyId23, KeyUsage::default().set_aes_key_en());
+
         aes.aes_256_ecb_decrypt_kv(KEY, &CT[..], key_write_args)?;
         if plaintext != PT {
             Err(CaliptraError::KAT_AES_PLAINTEXT_MISMATCH)?;
