@@ -1003,6 +1003,8 @@ impl Aes {
             KvAccess::begin_copy_to_kv(aes_clp.aes_kv_wr_status(), aes_clp.aes_kv_wr_ctrl(), output)
         });
 
+        cprintln!("Done copying");
+
         match res {
             Ok(_) => Ok(()),
             Err(e) => {

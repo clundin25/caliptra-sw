@@ -173,12 +173,14 @@ fn test_aes_kv() {
     assert_eq!(ciphertext, ct);
     let mut plaintext: [u8; 48] = [0u8; 48];
     Uart::new().write("starting\n");
-    aes.aes_256_ecb_decrypt_kv(
+    let res = aes.aes_256_ecb_decrypt_kv(
         KEY,
         &ct[..],
         KeyWriteArgs::new(KeyId::KeyId23, KeyUsage::default().set_aes_key_en()),
-    )
-    .unwrap();
+    );
+    Uart::new().write("flush\n");
+    res.unwrap();
+    
     assert_eq!(plaintext, pt);
 }
 
