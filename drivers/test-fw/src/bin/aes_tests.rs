@@ -158,7 +158,6 @@ fn test_aes_kv() {
     let mut entropy_gen = || trng.generate4();
     CfiCounter::reset(&mut entropy_gen);
 
-
     const KEY: AesKey<'_> = AesKey::Array(&[0u8; 32]);
     let pt: [u8; 48] = [0u8; 48];
     let ct: [u8; 48] = [
@@ -173,8 +172,13 @@ fn test_aes_kv() {
 
     assert_eq!(ciphertext, ct);
     let mut plaintext: [u8; 48] = [0u8; 48];
-    aes.aes_256_ecb_decrypt_kv(KEY, AesOperation::Decrypt, &ct[..], KeyId::KeyId23)
-        .unwrap();
+    aes.aes_256_ecb_decrypt_kv(
+        KEY,
+        AesOperation::Decrypt,
+        &ct[..],
+        KeyWriteArgs::new(KeyId::KeyId23, KeyUsage::default().set_aes_key_en()),
+    )
+    .unwrap();
     assert_eq!(plaintext, pt);
 }
 

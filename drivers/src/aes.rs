@@ -18,7 +18,9 @@ Abstract:
 
 --*/
 
-use crate::{kv_access::KvAccess, CaliptraError, CaliptraResult, KeyId, KeyReadArgs, KeyWriteArgs, Trng};
+use crate::{
+    kv_access::KvAccess, CaliptraError, CaliptraResult, KeyId, KeyReadArgs, KeyWriteArgs, Trng,
+};
 use caliptra_api::mailbox::CmAesMode;
 #[cfg(not(feature = "no-cfi"))]
 use caliptra_cfi_derive::cfi_impl_fn;
