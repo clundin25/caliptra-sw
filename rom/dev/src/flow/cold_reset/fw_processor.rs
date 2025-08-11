@@ -416,6 +416,7 @@ impl FirmwareProcessor {
                         return Err(CaliptraError::RUNTIME_SHUTDOWN);
                     }
                     CommandId::TEST_OCP_LOCK => {
+                        cprintln!("[ROM] Testing OCP LOCK");
                         let mut request = MailboxReqHeader::default();
                         Self::copy_req_verify_chksum(&mut txn, request.as_mut_bytes(), false)?;
                         if let Err(e) = crate::flow::ocp_lock::OcpLockFlow::run(

@@ -16,7 +16,10 @@ use crate::rom_env::RomEnv;
 use caliptra_cfi_derive::cfi_impl_fn;
 use caliptra_common::{
     cprintln,
-    keyids::{ocp_lock::{KEY_ID_HEK, KEY_ID_MDK, KEY_ID_EPK, KEY_ID_MEK}, KEY_ID_ROM_FMC_CDI, KEY_ID_TMP},
+    keyids::{
+        ocp_lock::{KEY_ID_EPK, KEY_ID_HEK, KEY_ID_MDK, KEY_ID_MEK},
+        KEY_ID_ROM_FMC_CDI, KEY_ID_TMP, KEY_ID_UDS,
+    },
 };
 use caliptra_drivers::{
     Aes, AesKey, AesOperation, Array4x16, Array4x8, AxiAddr, CaliptraError, CaliptraResult,
@@ -67,8 +70,10 @@ fn validation_flow(
     check_populate_mek_with_aes(aes, hmac, trng);
     check_populate_mek_with_hmac(hmac, trng);
 
-    cprintln!("[ROM] OCP LOCK: LOCKING ROM");
+    cprintln!("[ROM] OCP LOCK: LOCKING OCP");
     soc.ocp_lock_set_lock_in_progress();
+
+    check_locked_hmac(hmac, trng);
     Ok(())
 }
 
@@ -103,10 +108,7 @@ fn check_populate_mek_with_aes(
     Ok(())
 }
 
-fn check_populate_mek_with_hmac(
-    hmac: &mut Hmac,
-    trng: &mut Trng,
-) -> CaliptraResult<()> {
+fn check_populate_mek_with_hmac(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
     cprintln!("[ROM] check_populate_mek_with_hmac");
     // Using the EPK slot. Any OCP LOCK slot will work.
     populate_slot(hmac, trng, KEY_ID_EPK)?;
@@ -115,9 +117,42 @@ fn check_populate_mek_with_hmac(
         HmacKey::Key(KeyReadArgs::new(KEY_ID_EPK)),
         HmacData::from(&[0]),
         trng,
-        KeyWriteArgs::new(KEY_ID_MEK, KeyUsage::default().set_hmac_key_en().set_aes_key_en()).into(),
+        KeyWriteArgs::new(
+            KEY_ID_MEK,
+            KeyUsage::default().set_hmac_key_en().set_aes_key_en(),
+        )
+        .into(),
         HmacMode::Hmac512,
-    )
+    )?;
+
+    cprintln!("[ROM] check_populate_mek_with_hmac PASSED");
+    Ok(())
+}
+
+fn check_locked_hmac(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
+    cprintln!("[ROM] check_locked_hmac");
+
+    // It should no longer be possible to perform an HMAC for non-OCP KV => OCP KV.
+    // Assumes `KEY_ID_UDS` has been populated.
+    let res = hmac.hmac(
+        HmacKey::Key(KeyReadArgs::new(KEY_ID_UDS)),
+        HmacData::from(&[0]),
+        trng,
+        KeyWriteArgs::new(
+            KEY_ID_EPK,
+            KeyUsage::default().set_hmac_key_en().set_aes_key_en(),
+        )
+        .into(),
+        HmacMode::Hmac512,
+    );
+
+    if res.is_ok() {
+        cprintln!("[ROM] check_locked_hmac FAILED");
+    } else {
+        cprintln!("[ROM] check_locked_hmac PASSED");
+    }
+    // TODO: We want these checks to fail.
+    Ok(())
 }
 
 /// Populate slot with garbage for testing.
