@@ -85,7 +85,7 @@ impl Aes256EcbKat {
                 .set_hmac_data_en(),
         );
 
-        aes.aes_256_ecb_decrypt_kv(AesKey::KV(key_read_args), &CT[..32], key_write_args)?;
+        aes.aes_256_ecb_decrypt_kv(AesKey::KV(key_read_args), &[0; 64], key_write_args)?;
         if plaintext != PT {
             Err(CaliptraError::KAT_AES_PLAINTEXT_MISMATCH)?;
         }
