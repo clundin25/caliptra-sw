@@ -74,6 +74,7 @@ fn validation_flow(
     soc.ocp_lock_set_lock_in_progress();
 
     check_locked_hmac(hmac, trng);
+    check_locked_hek(hmac, trng);
     Ok(())
 }
 
@@ -129,6 +130,7 @@ fn check_populate_mek_with_hmac(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraRes
     Ok(())
 }
 
+/// We should no longer be able to write from a non-KV to a LOCK KV.
 fn check_locked_hmac(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
     cprintln!("[ROM] check_locked_hmac");
 
@@ -159,9 +161,29 @@ fn check_locked_hmac(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
     Ok(())
 }
 
-/// Populate slot with garbage for testing.
+/// We should still be able to write from a HEK to a LOCK KV.
+fn check_locked_hek(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
+    cprintln!("[ROM] check_locked_hek");
+
+    // Assumes `KEY_ID_HEK` has been populated.
+    let res = hmac.hmac(
+        HmacKey::Key(KeyReadArgs::new(KEY_ID_HEK)),
+        HmacData::from(&[0]),
+        trng,
+        KeyWriteArgs::new(
+            KEY_ID_EPK,
+            KeyUsage::default().set_hmac_key_en().set_aes_key_en(),
+        )
+        .into(),
+        HmacMode::Hmac512,
+    )?;
+
+    cprintln!("[ROM] check_locked_hek PASSED");
+    Ok(())
+}
+
+/// Populate slot for testing.
 fn populate_slot(hmac: &mut Hmac, trng: &mut Trng, slot: KeyId) -> CaliptraResult<()> {
-    cprintln!("[ROM] OCP LOCK filling HEK with garbage");
     hmac.hmac(
         HmacKey::Array4x16(&Array4x16::default()),
         HmacData::from(&[0]),
