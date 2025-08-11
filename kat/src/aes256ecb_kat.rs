@@ -12,7 +12,7 @@ Abstract:
 
 --*/
 
-use caliptra_drivers::{Aes, AesKey, AesOperation, CaliptraError, CaliptraResult, LEArray4x8};
+use caliptra_drivers::{Aes, AesKey, AesOperation, CaliptraError, CaliptraResult, LEArray4x8, KeyUsage, KeyWriteArgs, KeyReadArgs, KeyId, HmacMode, Hmac, Array4x12, Trng};
 
 // Generated from Python code:
 // >>> from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -53,7 +53,6 @@ impl Aes256EcbKat {
         let mut ciphertext: [u8; 48] = [0u8; 48];
         aes.aes_256_ecb(KEY, AesOperation::Encrypt, &PT[..], &mut ciphertext)?;
 
-        // 1. Fill Key Slot 16 w/
         hmac.hmac(
             caliptra_drivers::HmacKey::Array4x12(&Array4x12::default()),
             caliptra_drivers::HmacData::Slice(&[]),
