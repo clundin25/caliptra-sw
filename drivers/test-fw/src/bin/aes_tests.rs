@@ -178,7 +178,7 @@ fn test_aes_ecb_decrypt_kv() {
     let res = aes.aes_256_ecb_decrypt_kv(
         key,
         &ct[..],
-        KeyWriteArgs::new(KeyId::KeyId23, KeyUsage::default().set_aes_key_en()),
+        KeyWriteArgs::new(KeyId::KeyId23, KeyUsage::default().set_aes_key_en().set_hmac_data_en()),
     );
     Uart::new().write("flush\n");
     res.unwrap();

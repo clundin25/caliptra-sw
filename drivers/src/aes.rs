@@ -951,12 +951,13 @@ impl Aes {
             self.load_key(key)?;
         }
 
-        cprintln!("Begining KV copy");
+        cprintln!("Beginning KV copy");
         self.with_aes::<CaliptraResult<()>>(|aes, aes_clp| {
             wait_for_idle(&aes);
             KvAccess::begin_copy_to_kv(aes_clp.aes_kv_wr_status(), aes_clp.aes_kv_wr_ctrl(), output)
         })?;
 
+        cprintln!("Setting AES params");
         self.with_aes(|aes, _| {
             wait_for_idle(&aes);
             for _ in 0..2 {
@@ -972,6 +973,7 @@ impl Aes {
         });
 
         if !key.sideload() {
+            cprintln!("Loading firmware key");
             self.load_key(key)?;
         }
 
