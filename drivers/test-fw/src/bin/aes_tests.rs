@@ -5,7 +5,8 @@
 
 use caliptra_cfi_lib::CfiCounter;
 use caliptra_drivers::{
-    cprintln, Aes, AesKey, AesOperation, Array4x12, Ecc384, Ecc384PrivKeyOut, Ecc384Scalar, Ecc384Seed, KeyId, KeyReadArgs, KeyUsage, KeyWriteArgs, LEArray4x8, Trng, Uart
+    cprintln, Aes, AesKey, AesOperation, Array4x12, Ecc384, Ecc384PrivKeyOut, Ecc384Scalar,
+    Ecc384Seed, KeyId, KeyReadArgs, KeyUsage, KeyWriteArgs, LEArray4x8, Trng, Uart,
 };
 use caliptra_registers::aes::AesReg;
 use caliptra_registers::aes_clp::AesClpReg;
@@ -178,7 +179,10 @@ fn test_aes_ecb_decrypt_kv() {
     let res = aes.aes_256_ecb_decrypt_kv(
         key,
         &ct[..],
-        KeyWriteArgs::new(KeyId::KeyId23, KeyUsage::default().set_aes_key_en().set_hmac_data_en()),
+        KeyWriteArgs::new(
+            KeyId::KeyId23,
+            KeyUsage::default().set_aes_key_en().set_hmac_data_en(),
+        ),
     );
     Uart::new().write("flush\n");
     res.unwrap();

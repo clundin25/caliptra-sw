@@ -19,7 +19,10 @@ Abstract:
 --*/
 
 use crate::{
-    kv_access::{KvAccess, KvAccessErr}, CaliptraError, CaliptraResult, KeyReadArgs, LEArray4x4, LEArray4x8, Trng, KeyId, cprintln, KeyWriteArgs, KeyUsage,
+    cprintln,
+    kv_access::{KvAccess, KvAccessErr},
+    CaliptraError, CaliptraResult, KeyId, KeyReadArgs, KeyUsage, KeyWriteArgs, LEArray4x4,
+    LEArray4x8, Trng,
 };
 use caliptra_api::mailbox::CmAesMode;
 #[cfg(not(feature = "no-cfi"))]
