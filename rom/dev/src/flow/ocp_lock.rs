@@ -71,6 +71,9 @@ fn validation_flow(
     check_populate_mek_with_hmac(hmac, trng);
 
     cprintln!("[ROM] OCP LOCK: LOCKING OCP");
+    // This maybe belongs in a different test case.
+    populate_slot(hmac, trng, KEY_ID_HEK)?;
+
     soc.ocp_lock_set_lock_in_progress();
 
     check_locked_hmac(hmac, trng);
