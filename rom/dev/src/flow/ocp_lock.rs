@@ -133,9 +133,9 @@ fn check_locked_hmac(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
     cprintln!("[ROM] check_locked_hmac");
 
     // It should no longer be possible to perform an HMAC for non-OCP KV => OCP KV.
-    // Assumes `KEY_ID_UDS` has been populated.
+    // Assumes `KEY_ID_ROM_FMC_CDI` has been populated.
     let res = hmac.hmac(
-        HmacKey::Key(KeyReadArgs::new(KEY_ID_UDS)),
+        HmacKey::Key(KeyReadArgs::new(KEY_ID_ROM_FMC_CDI)),
         HmacData::from(&[0]),
         trng,
         KeyWriteArgs::new(
