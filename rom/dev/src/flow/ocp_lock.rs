@@ -18,13 +18,13 @@ use caliptra_common::{
     cprintln,
     keyids::{
         ocp_lock::{KEY_ID_EPK, KEY_ID_HEK, KEY_ID_MDK, KEY_ID_MEK},
-        KEY_ID_ROM_FMC_CDI, KEY_ID_TMP, KEY_ID_UDS,
+        KEY_ID_ROM_FMC_CDI, KEY_ID_STABLE_IDEV, KEY_ID_TMP, KEY_ID_UDS,
     },
 };
 use caliptra_drivers::{
-    Aes, AesKey, AesOperation, Array4x16, Array4x8, AxiAddr, CaliptraError, CaliptraResult,
-    DmaOtpCtrl, FuseBank, Hmac, HmacData, HmacKey, HmacMode, HmacTag, KeyId, KeyReadArgs, KeyUsage,
-    KeyWriteArgs, Lifecycle, SocIfc, Trng,
+    hmac_kdf, Aes, AesKey, AesOperation, Array4x16, Array4x8, AxiAddr, CaliptraError,
+    CaliptraResult, DmaOtpCtrl, FuseBank, Hmac, HmacData, HmacKey, HmacMode, HmacTag, KeyId,
+    KeyReadArgs, KeyUsage, KeyWriteArgs, Lifecycle, SocIfc, Trng,
 };
 
 const ROM_SUPPORTS_OCP_LOCK: bool = true;
@@ -70,9 +70,11 @@ fn validation_flow(
     check_populate_mek_with_aes(aes, hmac, trng);
     check_populate_mek_with_hmac(hmac, trng);
 
+    let hek_seed: [u8; 32] = fuse_bank.ocp_heck_seed().into();
+    check_hek(hmac, trng, &hek_seed)?;
+
     cprintln!("[ROM] OCP LOCK: LOCKING OCP");
-    // This maybe belongs in a different test case.
-    populate_slot(hmac, trng, KEY_ID_HEK)?;
+
 
     soc.ocp_lock_set_lock_in_progress();
 
@@ -182,6 +184,29 @@ fn check_locked_hek(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
     )?;
 
     cprintln!("[ROM] check_locked_hek PASSED");
+    Ok(())
+}
+
+fn check_hek(hmac: &mut Hmac, trng: &mut Trng, hek_seed: &[u8]) -> CaliptraResult<()> {
+    cprintln!("[ROM] check_populate_hek");
+
+    let res = hmac_kdf(
+        hmac,
+        HmacKey::Key(KeyReadArgs::new(KEY_ID_STABLE_IDEV)),
+        b"OCP_LOCK_HEK",
+        Some(hek_seed),
+        trng,
+        HmacTag::Key(
+            KeyWriteArgs::new(
+                KEY_ID_HEK,
+                KeyUsage::default().set_hmac_key_en().set_aes_key_en(),
+            )
+            .into(),
+        ),
+        HmacMode::Hmac512,
+    )?;
+
+    cprintln!("[ROM] check_populate_hek PASSED");
     Ok(())
 }
 

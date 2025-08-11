@@ -57,5 +57,6 @@ pub mod ocp_lock {
     pub const KEY_ID_MDK: KeyId = KeyId::KeyId16;
     pub const KEY_ID_EPK: KeyId = KeyId::KeyId17;
     pub const KEY_ID_HEK: KeyId = KeyId::KeyId22;
+    pub const KEY_ID_HEK_SEED: KeyId = KeyId::KeyId22;
     pub const KEY_ID_MEK: KeyId = KeyId::KeyId23;
 }
