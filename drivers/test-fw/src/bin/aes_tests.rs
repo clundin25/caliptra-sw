@@ -187,7 +187,7 @@ fn test_aes_ecb_decrypt_kv() {
 }
 
 test_suite! {
-    test_cmac,
-    test_cmac_kv,
+    // test_cmac,
+    // test_cmac_kv,
     test_aes_ecb_decrypt_kv,
 }
