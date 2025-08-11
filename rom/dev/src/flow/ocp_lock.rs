@@ -146,10 +146,14 @@ fn check_locked_hmac(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
         HmacMode::Hmac512,
     );
 
-    if res.is_ok() {
-        cprintln!("[ROM] check_locked_hmac FAILED");
-    } else {
-        cprintln!("[ROM] check_locked_hmac PASSED");
+    match res {
+        Ok(_) => {
+            cprintln!("[ROM] check_locked_hmac FAILED")
+        }
+        Err(e) => {
+            cprintln!("[ROM] Result is: 0x{:x}", u32::from(e));
+            cprintln!("[ROM] check_locked_hmac PASSED");
+        }
     }
     // TODO: We want these checks to fail.
     Ok(())
