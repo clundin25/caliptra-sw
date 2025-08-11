@@ -174,8 +174,7 @@ fn test_aes_ecb_decrypt_kv() {
         .unwrap();
 
     assert_eq!(ciphertext, ct);
-    let mut plaintext: [u8; 48] = [0u8; 48];
-    Uart::new().write("starting\n");
+    let mut plaintext: [u8; 64] = [0u8; 64];
     let res = aes.aes_256_ecb_decrypt_kv(
         key,
         &ct[..],
@@ -184,7 +183,6 @@ fn test_aes_ecb_decrypt_kv() {
             KeyUsage::default().set_aes_key_en().set_hmac_data_en(),
         ),
     );
-    Uart::new().write("flush\n");
     res.unwrap();
 
     assert_eq!(plaintext, pt);
