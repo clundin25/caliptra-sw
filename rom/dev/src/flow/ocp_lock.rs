@@ -27,13 +27,13 @@ use caliptra_drivers::{
     KeyReadArgs, KeyUsage, KeyWriteArgs, Lifecycle, SocIfc, Trng,
 };
 
-const ROM_SUPPORTS_OCP_LOCK: bool = true;
-
 pub struct OcpLockFlow {}
 
 impl OcpLockFlow {
     #[inline(never)]
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
+    /// Performs the ROM OCP LOCK flow.
+    /// TODO(clundin): implement.
     pub fn run(
         soc: &mut SocIfc,
         hmac: &mut Hmac,
@@ -44,18 +44,14 @@ impl OcpLockFlow {
         if !supports_ocp_lock(soc) {
             return Err(CaliptraError::ROM_OCP_LOCK_HARDWARE_UNSUPPORTED)?;
         }
-        validation_flow(soc, hmac, trng, aes)?;
+        #[cfg(test)]
+        {
+            // Run validation flow to confirm that OCP LOCK works as we expect.
+            validation_flow(soc, hmac, trng, aes)?;
+        }
         Ok(())
     }
 }
-
-//populate_slot(hmac, trng, KEY_ID_OCP_LOCK_HEK)?;
-//
-//check_aes_decrypt_mdk_to_fw(aes, trng)?;
-//check_hmac_ocp_kv_to_ocp_kv_lock_mode(hmac, trng)?;
-
-// TODO: This flow is not yet supported in HW.
-//check_hmac_regular_kv_to_ocp_kv_lock_mode(hmac, trng)?;
 
 fn validation_flow(
     soc: &mut SocIfc,
@@ -305,9 +301,14 @@ fn check_hmac_regular_kv_to_ocp_kv_lock_mode(
 /// # Returns true if OCP lock is supported.
 fn supports_ocp_lock(soc_ifc: &SocIfc) -> bool {
     #[cfg(feature = "ocp-lock")]
-    if soc_ifc.ocp_lock_enabled() {
-        cprintln!("[ROM] OCP LOCK supported in hardware and enabled in ROM");
-        return true;
+    {
+        if soc_ifc.ocp_lock_enabled() {
+            cprintln!("[ROM] OCP LOCK supported in hardware and enabled in ROM");
+            return true;
+        } else {
+            cprintln!("[ROM] OCP LOCK unsupported in hardware and enabled in ROM");
+            return false;
+        }
     }
 
     cprintln!("[ROM] OCP LOCK Disabled");

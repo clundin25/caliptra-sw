@@ -5,7 +5,8 @@
 
 use caliptra_cfi_lib::CfiCounter;
 use caliptra_drivers::{
-    cprintln, Aes, AesKey, AesOperation, Array4x12, Ecc384, Ecc384PrivKeyOut, Ecc384Scalar, Ecc384Seed, Hmac, HmacMode, KeyId, KeyReadArgs, KeyUsage, KeyWriteArgs, LEArray4x8, Trng, Uart
+    cprintln, Aes, AesKey, AesOperation, Array4x12, Ecc384, Ecc384PrivKeyOut, Ecc384Scalar,
+    Ecc384Seed, Hmac, HmacMode, KeyId, KeyReadArgs, KeyUsage, KeyWriteArgs, LEArray4x8, Trng, Uart,
 };
 use caliptra_registers::aes::AesReg;
 use caliptra_registers::aes_clp::AesClpReg;
@@ -170,8 +171,8 @@ fn test_aes_ecb_decrypt_kv() {
             KeyUsage::default().set_aes_key_en().set_hmac_key_en(),
         )),
         HmacMode::Hmac512,
-    ).unwrap();
-
+    )
+    .unwrap();
 
     let key_read_args = KeyReadArgs::new(KeyId::KeyId16);
     let key_write_args = KeyWriteArgs::new(
@@ -182,7 +183,8 @@ fn test_aes_ecb_decrypt_kv() {
             .set_hmac_data_en(),
     );
 
-    aes.aes_256_ecb_decrypt_kv(AesKey::KV(key_read_args), &[0; 64], key_write_args).unwrap();
+    aes.aes_256_ecb_decrypt_kv(AesKey::KV(key_read_args), &[0; 64], key_write_args)
+        .unwrap();
 }
 
 test_suite! {
