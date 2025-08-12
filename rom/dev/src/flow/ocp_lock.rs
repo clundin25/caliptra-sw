@@ -44,15 +44,16 @@ impl OcpLockFlow {
         if !supports_ocp_lock(soc) {
             return Err(CaliptraError::ROM_OCP_LOCK_HARDWARE_UNSUPPORTED)?;
         }
-        #[cfg(test)]
-        {
-            // Run validation flow to confirm that OCP LOCK works as we expect.
-            validation_flow(soc, hmac, trng, aes)?;
-        }
+
+        // TODO(clundin): Move validation tests into separate binary.
+        // Run validation flow to confirm that OCP LOCK works as we expect.
+        validation_flow(soc, hmac, trng, aes)?;
         Ok(())
     }
 }
 
+/// Exercises key OCP LOCK HW features.
+/// TODO(clundin): We should move this validation into a test binary.
 fn validation_flow(
     soc: &mut SocIfc,
     hmac: &mut Hmac,
@@ -60,8 +61,31 @@ fn validation_flow(
     aes: &mut Aes,
 ) -> CaliptraResult<()> {
     cprintln!("[ROM] Starting OCP LOCK Validation");
-    let fuse_bank = soc.fuse_bank();
 
+    if rom_validation_flow(soc, hmac, trng, aes).is_ok() {
+        cprintln!("[ROM] ROM OCP LOCK FLOW PASSED");
+    } else {
+        cprintln!("[ROM] ROM OCP LOCK FLOW FAILED");
+    }
+    cprintln!("[ROM] LOCKING OCP LOCK");
+    soc.ocp_lock_set_lock_in_progress();
+
+    if runtime_validation_flow(soc, hmac, trng, aes).is_ok() {
+        cprintln!("[ROM] RUNTIME OCP LOCK FLOW PASSED");
+    } else {
+        cprintln!("[ROM] RUNTIME OCP LOCK FLOW FAILED");
+    }
+    Ok(())
+}
+
+/// Exercises ROM specific OCP LOCK flows.
+fn rom_validation_flow(
+    soc: &mut SocIfc,
+    hmac: &mut Hmac,
+    trng: &mut Trng,
+    aes: &mut Aes,
+) -> CaliptraResult<()> {
+    let fuse_bank = soc.fuse_bank();
     check_hek_seed(&fuse_bank)?;
     check_populate_mek_with_aes(aes, hmac, trng);
     check_populate_mek_with_hmac(hmac, trng);
@@ -69,28 +93,38 @@ fn validation_flow(
     let hek_seed: [u8; 32] = fuse_bank.ocp_heck_seed().into();
     check_hek(hmac, trng, &hek_seed)?;
 
-    cprintln!("[ROM] OCP LOCK: LOCKING OCP");
+    Ok(())
+}
 
-    soc.ocp_lock_set_lock_in_progress();
-
+/// Exercises Runtime specific OCP LOCK flows.
+fn runtime_validation_flow(
+    soc: &mut SocIfc,
+    hmac: &mut Hmac,
+    trng: &mut Trng,
+    aes: &mut Aes,
+) -> CaliptraResult<()> {
     check_locked_hmac(hmac, trng);
     check_locked_hek(hmac, trng);
     Ok(())
 }
 
+/// Checks that the HEK seed fuse is set.
+/// TODO(clundin): Set the fuses in MCU to confirm everything is hooked up.
 fn check_hek_seed(fuse_bank: &FuseBank) -> CaliptraResult<()> {
     cprintln!("[ROM] OCP LOCK: Checking HEK seed");
     let hek_seed = fuse_bank.ocp_heck_seed();
 
     if hek_seed == Array4x8::default() {
-        cprintln!("[ROM] HEK seed is zerozed");
+        cprintln!("[ROM] HEK seed is zeroized");
     } else {
-        cprintln!("[ROM] HEK seed is not zerozed");
+        cprintln!("[ROM] HEK seed is not zeroized");
     }
+
+    cprintln!("[ROM] OCP LOCK: Checking HEK seed PASSED");
     Ok(())
 }
 
-// Currently get's stuck waiting for KV complete
+// Check that we can populate MEK slot with AES ECB Decryption.
 fn check_populate_mek_with_aes(
     aes: &mut Aes,
     hmac: &mut Hmac,
@@ -99,12 +133,18 @@ fn check_populate_mek_with_aes(
     cprintln!("[ROM] check_populate_mek_with_aes");
     populate_slot(hmac, trng, KEY_ID_MDK)?;
 
-    //let res = aes.aes_256_ecb(
-    //    AesKey::KV(KeyReadArgs::new(KEY_ID_OCP_LOCK_MDK)),
-    //    AesOperation::Decrypt,
-    //    &[0; 16],
-    //    &mut output,
-    //);
+    let mek_slot = KeyWriteArgs::new(
+            KEY_ID_MEK,
+            KeyUsage::default()
+                .set_hmac_key_en()
+                .set_dma_data_en()
+                .set_aes_key_en(),
+        );
+    aes.aes_256_ecb_decrypt_kv(
+        AesKey::KV(KeyReadArgs::new(KEY_ID_MDK)),
+        &[0; 64],
+        mek_slot,
+    )?;
 
     Ok(())
 }
