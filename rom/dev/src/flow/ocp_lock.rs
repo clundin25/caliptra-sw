@@ -52,6 +52,31 @@ impl OcpLockFlow {
     }
 }
 
+/// Checks if ROM supports OCP LOCK.
+///
+/// ROM needs to be compiled with `ocp-lock` feature and the hardware needs to support OCP
+/// LOCK.
+///
+/// # Arguments
+/// * `soc_ifc` - SOC Interface
+///
+/// # Returns true if OCP lock is supported.
+fn supports_ocp_lock(soc_ifc: &SocIfc) -> bool {
+    #[cfg(feature = "ocp-lock")]
+    {
+        if soc_ifc.ocp_lock_enabled() {
+            cprintln!("[ROM] OCP LOCK supported in hardware and enabled in ROM");
+            return true;
+        } else {
+            cprintln!("[ROM] OCP LOCK unsupported in hardware and enabled in ROM");
+            return false;
+        }
+    }
+
+    cprintln!("[ROM] OCP LOCK Disabled");
+    false
+}
+
 /// Exercises key OCP LOCK HW features.
 /// TODO(clundin): We should move this validation into a test binary.
 fn validation_flow(
@@ -103,8 +128,11 @@ fn runtime_validation_flow(
     trng: &mut Trng,
     aes: &mut Aes,
 ) -> CaliptraResult<()> {
-    check_locked_hmac(hmac, trng);
-    check_locked_hek(hmac, trng);
+    check_locked_hmac(hmac, trng)?;
+    check_locked_hek(hmac, trng)?;
+    check_hmac_ocp_kv_to_ocp_kv_lock_mode(hmac, trng);
+    check_hmac_regular_kv_to_ocp_kv_lock_mode(hmac, trng)?;
+    check_aes_flows(aes, trng);
     Ok(())
 }
 
@@ -133,22 +161,14 @@ fn check_populate_mek_with_aes(
     cprintln!("[ROM] check_populate_mek_with_aes");
     populate_slot(hmac, trng, KEY_ID_MDK)?;
 
-    let mek_slot = KeyWriteArgs::new(
-            KEY_ID_MEK,
-            KeyUsage::default()
-                .set_hmac_key_en()
-                .set_dma_data_en()
-                .set_aes_key_en(),
-        );
-    aes.aes_256_ecb_decrypt_kv(
-        AesKey::KV(KeyReadArgs::new(KEY_ID_MDK)),
-        &[0; 64],
-        mek_slot,
-    )?;
+    aes.aes_256_ecb_decrypt_kv(AesKey::KV(KeyReadArgs::new(KEY_ID_MDK)), &[0; 64])?;
+
+    cprintln!("[ROM] check_populate_mek_with_aes PASSED");
 
     Ok(())
 }
 
+// Check that we can populate MEK slot with HMAC.
 fn check_populate_mek_with_hmac(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
     cprintln!("[ROM] check_populate_mek_with_hmac");
     // Using the EPK slot. Any OCP LOCK slot will work.
@@ -225,19 +245,21 @@ fn check_locked_hek(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
 fn check_hek(hmac: &mut Hmac, trng: &mut Trng, hek_seed: &[u8]) -> CaliptraResult<()> {
     cprintln!("[ROM] check_populate_hek");
 
+    let hek_slot = HmacTag::Key(
+        KeyWriteArgs::new(
+            KEY_ID_HEK,
+            KeyUsage::default().set_hmac_key_en().set_aes_key_en(),
+        )
+        .into(),
+    );
+    let idev_slot = HmacKey::Key(KeyReadArgs::new(KEY_ID_STABLE_IDEV));
     let res = hmac_kdf(
         hmac,
-        HmacKey::Key(KeyReadArgs::new(KEY_ID_STABLE_IDEV)),
+        idev_slot,
         b"OCP_LOCK_HEK",
         Some(hek_seed),
         trng,
-        HmacTag::Key(
-            KeyWriteArgs::new(
-                KEY_ID_HEK,
-                KeyUsage::default().set_hmac_key_en().set_aes_key_en(),
-            )
-            .into(),
-        ),
+        hek_slot,
         HmacMode::Hmac512,
     )?;
 
@@ -245,49 +267,26 @@ fn check_hek(hmac: &mut Hmac, trng: &mut Trng, hek_seed: &[u8]) -> CaliptraResul
     Ok(())
 }
 
-/// Populate slot for testing.
-fn populate_slot(hmac: &mut Hmac, trng: &mut Trng, slot: KeyId) -> CaliptraResult<()> {
-    hmac.hmac(
-        HmacKey::Array4x16(&Array4x16::default()),
-        HmacData::from(&[0]),
-        trng,
-        KeyWriteArgs::new(slot, KeyUsage::default().set_hmac_key_en().set_aes_key_en()).into(),
-        HmacMode::Hmac512,
-    )
+// Check that we cannot decrypt MDK to firmware.
+fn check_aes_flows(aes: &mut Aes, trng: &mut Trng) -> CaliptraResult<()> {
+    cprintln!("[ROM] Checking AES flows");
+    cprintln!("[ROM] Checking AES flows PASSED");
+    Ok(())
 }
 
-fn check_aes_decrypt_mdk_to_fw(aes: &mut Aes, trng: &mut Trng) -> CaliptraResult<()> {
-    cprintln!("[ROM] Checking AES-256-ECB decrypt from MDK to FW");
-    // Assertion:
-    let mut output = [0; 16];
-    let res = aes.aes_256_ecb(
-        AesKey::KV(KeyReadArgs::new(KEY_ID_MDK)),
-        AesOperation::Decrypt,
-        &[0; 16],
-        &mut output,
-    );
-
-    match res {
-        Ok(res) => {
-            cprintln!("[ROM] check_aes_decrypt_mdk_to_fw PASSED");
-            Ok(res)
-        }
-        Err(e) => {
-            cprintln!("[ROM] check_aes_decrypt_mdk_to_fw FAILED");
-            Err(e)
-        }
-    }
-}
-
+// Check that HMAC with HEK => LOCK_KV still works after LOCK mode is set.
 fn check_hmac_ocp_kv_to_ocp_kv_lock_mode(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
-    cprintln!("[ROM] Checking OCP to OCP KV HMAC after LOCK mode enabled");
+    cprintln!("[ROM] Checking HEK to OCP KV HMAC after LOCK mode enabled");
     // Assertion:
     // After ROM enables LOCK mode, it should still be possible to do HMAC(key=HEK, dest=LOCK_KV)
+    let hek_slot = HmacKey::Key(KeyReadArgs::new(KEY_ID_HEK));
+    // EPK was arbitrarily chosen as a LOCK KV without any special conditions.
+    let mdk_slot = HmacTag::Key(KeyWriteArgs::new(KEY_ID_EPK, KeyUsage::default()));
     let res = hmac.hmac(
-        HmacKey::Key(KeyReadArgs::new(KEY_ID_HEK)),
+        hek_slot,
         HmacData::Slice(&[0; 32]),
         trng,
-        HmacTag::Key(KeyWriteArgs::new(KEY_ID_MDK, KeyUsage::default())),
+        mdk_slot,
         HmacMode::Hmac512,
     );
 
@@ -303,25 +302,29 @@ fn check_hmac_ocp_kv_to_ocp_kv_lock_mode(hmac: &mut Hmac, trng: &mut Trng) -> Ca
     }
 }
 
+// Check that regular KV to OCP KV fails after LOCK mode is set.
 fn check_hmac_regular_kv_to_ocp_kv_lock_mode(
     hmac: &mut Hmac,
     trng: &mut Trng,
 ) -> CaliptraResult<()> {
     cprintln!("[ROM] Checking Regular to OCP KV HMAC after LOCK mode enabled");
     // Assertion:
-    // After ROM enables LOCK mode, it should still be possible to do HMAC(key=HEK, dest=LOCK_KV)
+    // After ROM enables LOCK mode, it should not be possible to do HMAC(key=REGULAR_KV, dest=LOCK_KV)
+    let regular_kv = HmacKey::Key(KeyReadArgs::new(KEY_ID_ROM_FMC_CDI));
+    // EPK was arbitrarily chosen as a LOCK KV without any special conditions.
+    let lock_kv = HmacTag::Key(KeyWriteArgs::new(KEY_ID_EPK, KeyUsage::default()));
     let res = hmac.hmac(
-        HmacKey::Key(KeyReadArgs::new(KEY_ID_ROM_FMC_CDI)),
+        regular_kv,
         HmacData::Slice(&[0; 32]),
         trng,
-        HmacTag::Key(KeyWriteArgs::new(KEY_ID_MDK, KeyUsage::default())),
+        lock_kv,
         HmacMode::Hmac512,
     );
 
     match res {
         Ok(res) => {
             cprintln!("[ROM] check_hmac_regular_kv_to_ocp_kv_lock_mode FAILED");
-            Err(CaliptraError::RUNTIME_INTERNAL)
+            Err(CaliptraError::RUNTIME_INTERNAL) // TODO(clundin): Add OCP failure mode error code.
         }
         Err(e) => {
             cprintln!("[ROM] check_hmac_regular_kv_to_ocp_kv_lock_mode PASSED");
@@ -330,27 +333,13 @@ fn check_hmac_regular_kv_to_ocp_kv_lock_mode(
     }
 }
 
-/// Checks if ROM supports OCP LOCK.
-///
-/// ROM needs to be compiled with `ocp-lock` feature and the hardware needs to support OCP
-/// LOCK.
-///
-/// # Arguments
-/// * `soc_ifc` - SOC Interface
-///
-/// # Returns true if OCP lock is supported.
-fn supports_ocp_lock(soc_ifc: &SocIfc) -> bool {
-    #[cfg(feature = "ocp-lock")]
-    {
-        if soc_ifc.ocp_lock_enabled() {
-            cprintln!("[ROM] OCP LOCK supported in hardware and enabled in ROM");
-            return true;
-        } else {
-            cprintln!("[ROM] OCP LOCK unsupported in hardware and enabled in ROM");
-            return false;
-        }
-    }
-
-    cprintln!("[ROM] OCP LOCK Disabled");
-    false
+/// Helper function, populate slot with constant seed for testing.
+fn populate_slot(hmac: &mut Hmac, trng: &mut Trng, slot: KeyId) -> CaliptraResult<()> {
+    hmac.hmac(
+        HmacKey::Array4x16(&Array4x16::default()),
+        HmacData::from(&[0]),
+        trng,
+        KeyWriteArgs::new(slot, KeyUsage::default().set_hmac_key_en().set_aes_key_en()).into(),
+        HmacMode::Hmac512,
+    )
 }

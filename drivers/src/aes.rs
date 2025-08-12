@@ -938,12 +938,7 @@ impl Aes {
 
     // TODO: Document must decrypt 64 bytes.
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
-    pub fn aes_256_ecb_decrypt_kv(
-        &mut self,
-        key: AesKey,
-        input: &[u8],
-        output: KeyWriteArgs,
-    ) -> CaliptraResult<()> {
+    pub fn aes_256_ecb_decrypt_kv(&mut self, key: AesKey, input: &[u8]) -> CaliptraResult<()> {
         if input.is_empty() {
             return Ok(());
         }
@@ -964,22 +959,28 @@ impl Aes {
             _ => (),
         }
 
-        // We are only allowed to decrypt into KV 23.
-        if output.id != KeyId::KeyId23 {
-            Err(CaliptraError::RUNTIME_DRIVER_AES_WRITE_KV)?;
-        }
-
         if key.sideload() {
             self.load_key(key)?;
         }
 
-        // cprintln!("Beginning KV copy");
+        let mek_slot = KeyWriteArgs::new(
+            KeyId::KeyId23, // MEK KV.
+            KeyUsage::default()
+                .set_hmac_key_en()
+                .set_dma_data_en()
+                .set_aes_key_en(),
+        );
+
         self.with_aes::<CaliptraResult<()>>(|aes, aes_clp| {
             wait_for_idle(&aes);
-            KvAccess::begin_copy_to_kv(aes_clp.aes_kv_wr_status(), aes_clp.aes_kv_wr_ctrl(), output)
+            // We are only allowed to decrypt into KV 23.
+            KvAccess::begin_copy_to_kv(
+                aes_clp.aes_kv_wr_status(),
+                aes_clp.aes_kv_wr_ctrl(),
+                mek_slot,
+            )
         })?;
 
-        cprintln!("Setting AES params");
         self.with_aes(|aes, _| {
             wait_for_idle(&aes);
             for _ in 0..2 {
@@ -995,22 +996,15 @@ impl Aes {
         });
 
         if !key.sideload() {
-            cprintln!("Loading firmware key");
             self.load_key(key)?;
         }
-
-        cprintln!("Begun operation");
-
-        cprintln!("Loading blocks");
         for block_num in 0..input.chunks_exact(AES_BLOCK_SIZE_BYTES).len() {
             self.load_data_block(input, block_num)?;
         }
-        cprintln!("Done loading blocks");
 
         self.with_aes(|aes, aes_clp| {
             aes.trigger().write(|w| w.start(true));
-            cprintln!("Copying to kv");
-            match KvAccess::end_copy_to_kv(aes_clp.aes_kv_wr_status(), output) {
+            match KvAccess::end_copy_to_kv(aes_clp.aes_kv_wr_status(), mek_slot) {
                 Ok(_) => cprintln!("copyy done okay"),
                 Err(KvAccessErr::KeyRead) => cprintln!("key read fail"),
                 Err(KvAccessErr::KeyWrite) => cprintln!("key write fail"),
@@ -1019,8 +1013,6 @@ impl Aes {
         });
 
         self.zeroize_internal();
-
-        cprintln!("Done AES");
         Ok(())
     }
 
