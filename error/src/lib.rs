@@ -2135,7 +2135,11 @@ impl CaliptraError {
             0xa004_0001,
             "Driver Error: AES read key KV read"
         ),
-        // 0xa004_0002 blank to match HMAC errors
+        (
+            RUNTIME_DRIVER_AES_READ_KEY_KV_WRITE,
+            0xa004_0002,
+            "Driver Error: AES read key KV write"
+        ),
         (
             RUNTIME_DRIVER_AES_READ_KEY_KV_UNKNOWN,
             0xa004_0003,

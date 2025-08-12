@@ -160,13 +160,7 @@ impl KvAccess {
         status_reg: ureg::RegRef<SReg, TMmio>,
         _key: KeyWriteArgs,
     ) -> Result<(), KvAccessErr> {
-        let mut i = 0;
-        while !status_reg.read().valid() {
-            if i % 1000000 == 0 {
-                cprintln!("AES STILL NOT READY");
-            }
-            i += 1;
-        }
+        while !status_reg.read().valid() {}
         match status_reg.read().error() {
             KvErrorE::Success => Ok(()),
             KvErrorE::KvReadFail => Err(KvAccessErr::KeyRead),

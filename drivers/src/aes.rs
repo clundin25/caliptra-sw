@@ -1002,15 +1002,20 @@ impl Aes {
             self.load_data_block(input, block_num)?;
         }
 
-        self.with_aes(|aes, aes_clp| {
+        // TODO(clundin): Double check error messages.
+        self.with_aes::<CaliptraResult<()>>(|aes, aes_clp| {
             aes.trigger().write(|w| w.start(true));
             match KvAccess::end_copy_to_kv(aes_clp.aes_kv_wr_status(), mek_slot) {
-                Ok(_) => cprintln!("copyy done okay"),
-                Err(KvAccessErr::KeyRead) => cprintln!("key read fail"),
-                Err(KvAccessErr::KeyWrite) => cprintln!("key write fail"),
-                _ => cprintln!("other fail"),
+                Ok(_) => Ok(()),
+                Err(KvAccessErr::KeyRead) => {
+                    Err(CaliptraError::RUNTIME_DRIVER_AES_READ_KEY_KV_READ)
+                }
+                Err(KvAccessErr::KeyWrite) => {
+                    Err(CaliptraError::RUNTIME_DRIVER_AES_READ_KEY_KV_WRITE)
+                }
+                _ => Err(CaliptraError::RUNTIME_DRIVER_AES_READ_KEY_KV_UNKNOWN),
             }
-        });
+        })?;
 
         self.zeroize_internal();
         Ok(())

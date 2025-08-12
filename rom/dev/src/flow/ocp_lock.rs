@@ -67,9 +67,6 @@ fn supports_ocp_lock(soc_ifc: &SocIfc) -> bool {
         if soc_ifc.ocp_lock_enabled() {
             cprintln!("[ROM] OCP LOCK supported in hardware and enabled in ROM");
             return true;
-        } else {
-            cprintln!("[ROM] OCP LOCK unsupported in hardware and enabled in ROM");
-            return false;
         }
     }
 
@@ -112,8 +109,8 @@ fn rom_validation_flow(
 ) -> CaliptraResult<()> {
     let fuse_bank = soc.fuse_bank();
     check_hek_seed(&fuse_bank)?;
-    check_populate_mek_with_aes(aes, hmac, trng);
-    check_populate_mek_with_hmac(hmac, trng);
+    check_populate_mek_with_aes(aes, hmac, trng)?;
+    check_populate_mek_with_hmac(hmac, trng)?;
 
     let hek_seed: [u8; 32] = fuse_bank.ocp_heck_seed().into();
     check_hek(hmac, trng, &hek_seed)?;
@@ -130,9 +127,9 @@ fn runtime_validation_flow(
 ) -> CaliptraResult<()> {
     check_locked_hmac(hmac, trng)?;
     check_locked_hek(hmac, trng)?;
-    check_hmac_ocp_kv_to_ocp_kv_lock_mode(hmac, trng);
+    check_hmac_ocp_kv_to_ocp_kv_lock_mode(hmac, trng)?;
     check_hmac_regular_kv_to_ocp_kv_lock_mode(hmac, trng)?;
-    check_aes_flows(aes, trng);
+    check_aes_flows(aes, trng)?;
     Ok(())
 }
 
