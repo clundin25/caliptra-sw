@@ -75,7 +75,6 @@ fn validation_flow(
 
     cprintln!("[ROM] OCP LOCK: LOCKING OCP");
 
-
     soc.ocp_lock_set_lock_in_progress();
 
     check_locked_hmac(hmac, trng);

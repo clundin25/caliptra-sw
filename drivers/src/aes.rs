@@ -956,6 +956,19 @@ impl Aes {
             Err(CaliptraError::RUNTIME_DRIVER_AES_INVALID_SLICE)?;
         }
 
+        // Only KV 16 is a permitted input key to decrypt into KV 23.
+        match key {
+            AesKey::KV(KeyReadArgs { id }) if id != KeyId::KeyId16 => {
+                Err(CaliptraError::RUNTIME_DRIVER_AES_READ_KEY_KV_READ)?;
+            }
+            _ => (),
+        }
+
+        // We are only allowed to decrypt into KV 23.
+        if output.id != KeyId::KeyId23 {
+            Err(CaliptraError::RUNTIME_DRIVER_AES_WRITE_KV)?;
+        }
+
         if key.sideload() {
             self.load_key(key)?;
         }

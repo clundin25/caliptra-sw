@@ -2189,6 +2189,11 @@ impl CaliptraError {
             "Driver Error: AES tag is invalid"
         ),
         (
+            RUNTIME_DRIVER_AES_WRITE_KV,
+            0xa004_0012,
+            "Driver Error: AES output KV is invalid"
+        ),
+        (
             RUNTIME_MAILBOX_SIGNATURE_MISMATCH,
             0xa005_0000,
             "Runtime Error: Signaure mismatch"

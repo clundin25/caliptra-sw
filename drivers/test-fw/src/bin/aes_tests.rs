@@ -5,14 +5,14 @@
 
 use caliptra_cfi_lib::CfiCounter;
 use caliptra_drivers::{
-    cprintln, Aes, AesKey, AesOperation, Array4x12, Ecc384, Ecc384PrivKeyOut, Ecc384Scalar,
-    Ecc384Seed, KeyId, KeyReadArgs, KeyUsage, KeyWriteArgs, LEArray4x8, Trng, Uart,
+    cprintln, Aes, AesKey, AesOperation, Array4x12, Ecc384, Ecc384PrivKeyOut, Ecc384Scalar, Ecc384Seed, Hmac, HmacMode, KeyId, KeyReadArgs, KeyUsage, KeyWriteArgs, LEArray4x8, Trng, Uart
 };
 use caliptra_registers::aes::AesReg;
 use caliptra_registers::aes_clp::AesClpReg;
 use caliptra_registers::csrng::CsrngReg;
 use caliptra_registers::ecc::EccReg;
 use caliptra_registers::entropy_src::EntropySrcReg;
+use caliptra_registers::hmac::HmacReg;
 use caliptra_registers::soc_ifc::SocIfcReg;
 use caliptra_registers::soc_ifc_trng::SocIfcTrngReg;
 use caliptra_test_harness::test_suite;
@@ -157,30 +157,32 @@ fn test_aes_ecb_decrypt_kv() {
         .unwrap()
     };
     let mut aes = unsafe { Aes::new(AesReg::new(), AesClpReg::new()) };
+    let mut hmac = unsafe { Hmac::new(HmacReg::new()) };
     let mut entropy_gen = || trng.generate4();
     CfiCounter::reset(&mut entropy_gen);
 
-    let key = LEArray4x8::default();
-    let key: AesKey<'_> = AesKey::Array(&key);
-    let pt: [u8; 48] = [0u8; 48];
-    let ct: [u8; 48] = [
-        0xdc, 0x95, 0xc0, 0x78, 0xa2, 0x40, 0x89, 0x89, 0xad, 0x48, 0xa2, 0x14, 0x92, 0x84, 0x20,
-        0x87, 0xdc, 0x95, 0xc0, 0x78, 0xa2, 0x40, 0x89, 0x89, 0xad, 0x48, 0xa2, 0x14, 0x92, 0x84,
-        0x20, 0x87, 0xdc, 0x95, 0xc0, 0x78, 0xa2, 0x40, 0x89, 0x89, 0xad, 0x48, 0xa2, 0x14, 0x92,
-        0x84, 0x20, 0x87,
-    ];
+    hmac.hmac(
+        caliptra_drivers::HmacKey::Array4x12(&Array4x12::default()),
+        caliptra_drivers::HmacData::Slice(&[]),
+        &mut trng,
+        caliptra_drivers::HmacTag::Key(KeyWriteArgs::new(
+            KeyId::KeyId16,
+            KeyUsage::default().set_aes_key_en().set_hmac_key_en(),
+        )),
+        HmacMode::Hmac512,
+    ).unwrap();
 
-    let mut plaintext: [u8; 64] = [0u8; 64];
-    let res = aes.aes_256_ecb_decrypt_kv(
-        key,
-        &plaintext[..],
-        KeyWriteArgs::new(
-            KeyId::KeyId23,
-            KeyUsage::default().set_aes_key_en().set_hmac_data_en(),
-        ),
+
+    let key_read_args = KeyReadArgs::new(KeyId::KeyId16);
+    let key_write_args = KeyWriteArgs::new(
+        KeyId::KeyId23,
+        KeyUsage::default()
+            .set_aes_key_en()
+            .set_dma_data_en()
+            .set_hmac_data_en(),
     );
-    res.unwrap();
-    // assert_eq!(plaintext, pt);
+
+    aes.aes_256_ecb_decrypt_kv(AesKey::KV(key_read_args), &[0; 64], key_write_args).unwrap();
 }
 
 test_suite! {
