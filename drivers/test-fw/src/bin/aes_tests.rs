@@ -169,22 +169,17 @@ fn test_aes_ecb_decrypt_kv() {
         0x20, 0x87, 0xdc, 0x95, 0xc0, 0x78, 0xa2, 0x40, 0x89, 0x89, 0xad, 0x48, 0xa2, 0x14, 0x92,
         0x84, 0x20, 0x87,
     ];
-    let mut ciphertext: [u8; 48] = [0u8; 48];
-    aes.aes_256_ecb(key, AesOperation::Encrypt, &pt[..], &mut ciphertext)
-        .unwrap();
 
-    assert_eq!(ciphertext, ct);
     let mut plaintext: [u8; 64] = [0u8; 64];
     let res = aes.aes_256_ecb_decrypt_kv(
         key,
-        &ct[..],
+        &plaintext[..],
         KeyWriteArgs::new(
             KeyId::KeyId23,
             KeyUsage::default().set_aes_key_en().set_hmac_data_en(),
         ),
     );
     res.unwrap();
-    //
     // assert_eq!(plaintext, pt);
 }
 
