@@ -936,6 +936,7 @@ impl Aes {
         Ok(())
     }
 
+    // TODO: Document must decrypt 64 bytes.
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
     pub fn aes_256_ecb_decrypt_kv(
         &mut self,
@@ -950,11 +951,16 @@ impl Aes {
             Err(CaliptraError::RUNTIME_DRIVER_AES_INVALID_SLICE)?;
         }
 
+        // The KV write will never be triggered if the write is less than 64 bytes.
+        if input.len() < 64 {
+            Err(CaliptraError::RUNTIME_DRIVER_AES_INVALID_SLICE)?;
+        }
+
         if key.sideload() {
             self.load_key(key)?;
         }
 
-        cprintln!("Beginning KV copy");
+        // cprintln!("Beginning KV copy");
         self.with_aes::<CaliptraResult<()>>(|aes, aes_clp| {
             wait_for_idle(&aes);
             KvAccess::begin_copy_to_kv(aes_clp.aes_kv_wr_status(), aes_clp.aes_kv_wr_ctrl(), output)
