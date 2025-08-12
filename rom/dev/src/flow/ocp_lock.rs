@@ -109,6 +109,7 @@ fn rom_validation_flow(
 ) -> CaliptraResult<()> {
     let fuse_bank = soc.fuse_bank();
     check_hek_seed(&fuse_bank)?;
+    check_populate_mdk(hmac, trng)?;
     check_populate_mek_with_aes(aes, hmac, trng)?;
     check_populate_mek_with_hmac(hmac, trng)?;
 
@@ -129,7 +130,6 @@ fn runtime_validation_flow(
     check_locked_hek(hmac, trng)?;
     check_hmac_ocp_kv_to_ocp_kv_lock_mode(hmac, trng)?;
     check_hmac_regular_kv_to_ocp_kv_lock_mode(hmac, trng)?;
-    check_aes_flows(aes, trng)?;
     Ok(())
 }
 
@@ -149,6 +149,30 @@ fn check_hek_seed(fuse_bank: &FuseBank) -> CaliptraResult<()> {
     Ok(())
 }
 
+fn check_populate_mdk(hmac: &mut Hmac, trng: &mut Trng) -> CaliptraResult<()> {
+    cprintln!("[ROM] OCP LOCK: Checking check_populate_mdk");
+    //TODO(clundin): Double check `KEY_ID_ROM_FMC_CDI` == IDEV ID CDI.
+    let cdi_slot = HmacKey::Key(KeyReadArgs::new(KEY_ID_ROM_FMC_CDI));
+    let mdk_slot = HmacTag::Key(
+        KeyWriteArgs::new(
+            KEY_ID_MDK,
+            KeyUsage::default().set_hmac_key_en().set_aes_key_en(),
+        )
+        .into(),
+    );
+    let res = hmac_kdf(
+        hmac,
+        cdi_slot,
+        b"OCP_LOCK_MDK",
+        None,
+        trng,
+        mdk_slot,
+        HmacMode::Hmac512,
+    )?;
+    cprintln!("[ROM] OCP LOCK: check_populate_mdk PASSED");
+    Ok(())
+}
+
 // Check that we can populate MEK slot with AES ECB Decryption.
 fn check_populate_mek_with_aes(
     aes: &mut Aes,
@@ -156,12 +180,8 @@ fn check_populate_mek_with_aes(
     trng: &mut Trng,
 ) -> CaliptraResult<()> {
     cprintln!("[ROM] check_populate_mek_with_aes");
-    populate_slot(hmac, trng, KEY_ID_MDK)?;
-
     aes.aes_256_ecb_decrypt_kv(AesKey::KV(KeyReadArgs::new(KEY_ID_MDK)), &[0; 64])?;
-
     cprintln!("[ROM] check_populate_mek_with_aes PASSED");
-
     Ok(())
 }
 
@@ -261,13 +281,6 @@ fn check_hek(hmac: &mut Hmac, trng: &mut Trng, hek_seed: &[u8]) -> CaliptraResul
     )?;
 
     cprintln!("[ROM] check_populate_hek PASSED");
-    Ok(())
-}
-
-// Check that we cannot decrypt MDK to firmware.
-fn check_aes_flows(aes: &mut Aes, trng: &mut Trng) -> CaliptraResult<()> {
-    cprintln!("[ROM] Checking AES flows");
-    cprintln!("[ROM] Checking AES flows PASSED");
     Ok(())
 }
 
