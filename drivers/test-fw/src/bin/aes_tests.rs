@@ -176,7 +176,7 @@ fn test_aes_ecb_decrypt_kv() {
 
     let key_read_args = KeyReadArgs::new(KeyId::KeyId16);
     let res = aes.aes_256_ecb_decrypt_kv(AesKey::KV(key_read_args), &[0; 64]);
-    if res.ok() {
+    if res.is_ok() {
         cprintln!("Passed");
     } else {
         cprintln!("Failed");
