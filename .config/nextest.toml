@@ -3,7 +3,7 @@
 [profile.nightly]
 failure-output = "immediate-final"
 fail-fast = false
-slow-timeout = { period = "30s", terminate-after = 6 }
+slow-timeout = { period = "30s", terminate-after = 1 }
 
 [[profile.nightly.overrides]]
 filter = 'test(test_generate_csr_envelop_stress)'
