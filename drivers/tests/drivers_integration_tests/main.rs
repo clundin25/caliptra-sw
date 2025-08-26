@@ -5,7 +5,7 @@ use std::error::Error;
 use std::iter;
 
 use caliptra_builder::{firmware, FwId};
-use caliptra_drivers::{Array4x12, Array4xN, Ecc384PubKey};
+use caliptra_drivers::{cprintln, Array4x12, Array4xN, Ecc384PubKey};
 use caliptra_drivers_test_bin::DoeTestResults;
 use caliptra_hw_model::{
     BootParams, DefaultHwModel, DeviceLifecycle, HwModel, InitParams, ModelError, SecurityState,
@@ -48,6 +48,14 @@ fn start_driver_test(test_rom: &'static FwId) -> Result<DefaultHwModel, Box<dyn 
 fn run_driver_test(test_rom: &'static FwId) {
     let mut model = start_driver_test(test_rom).unwrap();
     // Wrap in a line-writer so output from different test threads doesn't multiplex within a line.
+    model.step_until_exit_success().unwrap();
+}
+
+fn run_driver_test_warm_reset(test_rom: &'static FwId) {
+    let mut model = start_driver_test(test_rom).unwrap();
+    // Wrap in a line-writer so output from different test threads doesn't multiplex within a line.
+    model.step_until_output("READY FOR RESET").unwrap();
+    model.warm_reset();
     model.step_until_exit_success().unwrap();
 }
 
@@ -1147,6 +1155,18 @@ fn test_mailbox_txn_drop() {
 #[test]
 fn test_dma_sha384() {
     run_driver_test(&firmware::driver_tests::DMA_SHA384);
+}
+
+#[cfg_attr(not(feature = "fpga_subsystem"), ignore)]
+#[test]
+fn test_ocp_lock() {
+    run_driver_test(&firmware::driver_tests::OCP_LOCK);
+}
+
+#[cfg_attr(not(feature = "fpga_subsystem"), ignore)]
+#[test]
+fn test_ocp_lock_warm_reset() {
+    run_driver_test_warm_reset(&firmware::driver_tests::OCP_LOCK_WARM_RESET);
 }
 
 // This test only works on the subsystem FPGA for now
