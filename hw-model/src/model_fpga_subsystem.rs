@@ -193,7 +193,7 @@ pub struct XI3CWrapper {
     // TODO: Possibly use Mutex to protect access as well.
     pub i3c_mmio: *mut u32,
     pub i3c_controller_mmio: *mut u32,
-    pub configured: AtomicBool,
+    pub configured: Arc<AtomicBool>,
 }
 
 // needed to copy pointers
@@ -220,7 +220,7 @@ impl XI3CWrapper {
     }
 
     pub fn configure(&self) {
-        if self.configured {
+        if self.configured.load(Ordering::Relaxed) {
             println!("I3C controller already initialized");
             return
         }
@@ -1269,6 +1269,7 @@ impl HwModel for ModelFpgaSubsystem {
                 controller: Arc::new(Mutex::new(i3c_controller)),
                 i3c_mmio,
                 i3c_controller_mmio,
+                configured: Arc::new(AtomicBool::new(false)),
             },
             jtag_tap: None,
             otp_mmio,
@@ -1531,7 +1532,7 @@ impl HwModel for ModelFpgaSubsystem {
         // TODO(zhalvorsen): Instead of waiting a fixed number of steps this should only wait until
         // it is done or timeout.
         for _ in 0..1_000_000 {
-            if !self.i3c_controller.configured && self.i3c_target_configured() {
+            if !self.i3c_controller.configured.load(Ordering::Relaxed) && self.i3c_target_configured() {
                 self.i3c_controller.configured.store(true, Ordering::Relaxed);
                 println!("I3C target configured");
                 self.i3c_controller.configure();
