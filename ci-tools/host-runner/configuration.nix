@@ -149,6 +149,10 @@ in
     rtool
     picocom
     usbsdmux
+    usbutils
+    cargo
+    rustc
+    gdb
   ];
 
   programs.zsh.enable = true;

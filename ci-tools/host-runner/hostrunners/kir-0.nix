@@ -66,7 +66,7 @@
         export ZCU_FTDI="1-1.1.3"
         export ZCU_SDWIRE="1-1.1.4"
 
-        caliptra-fpga-boss --zcu104 $ZCU_FTDI --sdwire $ZCU_SDWIRE "$@"
+        rust-gdb --args caliptra-fpga-boss --zcu104 $ZCU_FTDI --sdwire $ZCU_SDWIRE "$@"
      ''))
   ];
 }
