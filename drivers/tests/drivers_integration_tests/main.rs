@@ -39,6 +39,7 @@ fn start_driver_test(test_rom: &'static FwId) -> Result<DefaultHwModel, Box<dyn 
         InitParams {
             rom: &rom,
             subsystem_mode: true,
+            ocp_lock_en: true,
             ..default_init_params()
         },
         BootParams::default(),
@@ -1202,7 +1203,6 @@ fn test_dma_sha384() {
     }
 }
 
-#[cfg_attr(not(feature = "fpga_subsystem"), ignore)]
 #[test]
 fn test_ocp_lock() {
     run_driver_test(&firmware::driver_tests::OCP_LOCK);
