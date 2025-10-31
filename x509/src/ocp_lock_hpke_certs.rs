@@ -111,6 +111,8 @@ pub mod ml_kem_ecc_348 {
             let mut buf = vec![0u8; builder.len()];
             builder.build(&mut buf).unwrap();
 
+            std::fs::write("cert.der", &buf);
+
             let cert: X509 = X509::from_der(&buf).unwrap();
             assert!(cert.verify(issuer_key.priv_key()).unwrap());
 

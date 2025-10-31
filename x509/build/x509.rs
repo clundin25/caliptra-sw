@@ -152,8 +152,9 @@ impl Ecc384AsymKey {
 
         let bn = BigNum::from_slice(seed).unwrap();
         let mut key_bn = BigNum::new().unwrap();
+        dbg!(&bn);
         key_bn.nnmod(&bn, &group_order, bn_ctx).unwrap();
-        bn
+        key_bn
     }
 
     fn from_seed(seed: &[u8; 72]) -> Self {
@@ -164,10 +165,12 @@ impl Ecc384AsymKey {
         let private_key_point = Self::create_private_bignum(seed, &ecc_group, &mut bn_ctx);
         let priv_key =
             EcKey::from_private_components(&ecc_group, &private_key_point, &public_point).unwrap();
+        priv_key.check_key().unwrap();
         let pub_key = priv_key
             .public_key()
             .to_bytes(&ecc_group, PointConversionForm::UNCOMPRESSED, &mut bn_ctx)
             .unwrap();
+        dbg!(&pub_key.len());
         Self {
             priv_key: PKey::from_ec_key(priv_key).unwrap(),
             pub_key,
@@ -289,7 +292,7 @@ impl SigningAlgorithm for MlKem1024EcP384Algo {
 }
 
 pub struct MlKem1024EcP384dKey {
-    sk: [u8; 32],
+    _sk: [u8; 32],
     pub_key: Vec<u8>,
 }
 
@@ -313,9 +316,19 @@ impl MlKem1024EcP384dKey {
         let ml_kem = MlKem1024Key::from_seed(&expanded[..64].try_into().unwrap());
         // Generate EC P-384 key from last `62` bytes of `expanded`.
         let ec_kem = Ecc384AsymKey::from_seed(&expanded[64..].try_into().unwrap());
+
+        // From KeyGen algorithm:
+        // return sk, concat(pq_PK, trad_PK)
+        let mut pub_key = Vec::new();
+        pub_key.extend_from_slice(ml_kem.pub_key());
+        dbg!(ec_kem.pub_key().len());
+        pub_key.extend_from_slice(ec_kem.pub_key());
+
+        dbg!(&pub_key.len());
+
         Self {
-            sk,
-            pub_key: Vec::new(),
+            _sk: sk,
+            pub_key,
         }
     }
 }
@@ -328,11 +341,11 @@ impl Default for MlKem1024EcP384dKey {
 
 impl AsymKey for MlKem1024EcP384dKey {
     fn pub_key(&self) -> &[u8] {
-        todo!()
+        &self.pub_key
     }
 
     fn priv_key(&self) -> &PKey<Private> {
-        todo!()
+        todo!("[clundin]: This requires a change to the trait but we never need to sign anything with this key type anyway")
     }
 }
 
@@ -621,14 +634,14 @@ impl HPKEIdentifiers {
     }
 }
 
+//https://www.ietf.org/archive/id/draft-ietf-lamps-pq-composite-kem-05.html#name-composite-ml-kem-algorithm-
+const ML_KEM_1024_ECDH_P384: &str = "2.16.840.1.114027.80.5.2.1.27";
 impl HPKEIdentifiers {
     // TCG_STORAGE_HPKE_
     pub const OID: &str = "2.23.133.21.1.1";
 
     /// KEM id's
     pub const ML_KEM_1024_IANA_CODE_POINT: KemId = KemId(0x0042);
-    // TODO(clundin): This will be used in a follow up PR.
-    #[allow(dead_code)]
     pub const ML_KEM_EC_P384_IANA_CODE_POINT: KemId = KemId(0x0052);
     pub const ECDH_P384_IANA_CODE_POINT: KemId = KemId(0x0011);
 

@@ -217,13 +217,14 @@ fn gen_rt_alias_cert(out_dir: &str) {
 /// Generate OCP LOCK HPKE Endorsement Certificate Templates
 #[cfg(feature = "generate_templates")]
 fn gen_ocp_lock_endorsement_cert(out_dir: &str) {
-    use x509::{HPKEIdentifiers, MlKem1024Algo, MlKem1024EcP384dKey};
+    use x509::{HPKEIdentifiers, MlKem1024Algo, MlKem1024EcP384Algo};
     let mut usage = KeyUsage::default();
     // 4.2.2.1.3
     // In addition, the X.509 extended attributes SHALL:
     // * Indicate the key usage as keyEncipherment
     usage.set_key_encipherment(true);
 
+    // ML-KEM Certs
     let bldr = cert::CertTemplateBuilder::<EcdsaSha384Algo, MlKem1024Algo>::new()
         .add_basic_constraints_ext(false, 0)
         .add_key_usage_ext(usage)
@@ -251,7 +252,9 @@ fn gen_ocp_lock_endorsement_cert(out_dir: &str) {
         "Caliptra 2.0 MlDsa87 Rt Alias",
     );
     CodeGen::gen_code("OcpLockMlKemCertTbsMlDsa87", template, out_dir);
+    // end ML-KEM Certs
 
+    // P-384 Certs
     let bldr = cert::CertTemplateBuilder::<EcdsaSha384Algo, EcdsaSha384Algo>::new()
         .add_basic_constraints_ext(false, 0)
         .add_key_usage_ext(usage)
@@ -279,6 +282,20 @@ fn gen_ocp_lock_endorsement_cert(out_dir: &str) {
         "Caliptra 2.0 MlDsa87 Rt Alias",
     );
     CodeGen::gen_code("OcpLockEcdh384CertTbsMlDsa87", template, out_dir);
+    // End P-384 Certs
 
-    MlKem1024EcP384dKey::default();
+    // Hybrid Certs
+    let bldr = cert::CertTemplateBuilder::<EcdsaSha384Algo, MlKem1024EcP384Algo>::new()
+        .add_basic_constraints_ext(false, 0)
+        .add_key_usage_ext(usage)
+        .add_hpke_identifiers_ext(&HPKEIdentifiers::new(
+            HPKEIdentifiers::ML_KEM_EC_P384_IANA_CODE_POINT,
+            HPKEIdentifiers::HKDF_SHA384_IANA_CODE_POINT,
+            HPKEIdentifiers::AES_256_GCM_IANA_CODE_POINT,
+        ));
+    let template = bldr.tbs_template(
+        "OCP LOCK HPKE Endorsement QSF-KEM(ML-KEM-1024,P-384)",
+        "Caliptra 2.0 Ecc384 Rt Alias",
+    );
+    CodeGen::gen_code("OcpLockMLKem1024Ecdh384CertTbsEcc384", template, out_dir);
 }
