@@ -152,20 +152,32 @@ impl Ecc384AsymKey {
 
         let bn = BigNum::from_slice(seed).unwrap();
         let mut key_bn = BigNum::new().unwrap();
-        dbg!(&bn);
         key_bn.nnmod(&bn, &group_order, bn_ctx).unwrap();
         key_bn
     }
 
+    fn create_public_key_point(
+        private_key_point: &BigNum,
+        ecc_group: &EcGroup,
+        bn_ctx: &mut BigNumContext,
+    ) -> EcPoint {
+        let mut public_point = EcPoint::new(ecc_group).unwrap();
+        public_point.mul_generator(ecc_group, &private_key_point, bn_ctx).unwrap();
+        public_point
+    }
+
     fn from_seed(seed: &[u8; 72]) -> Self {
-        let ecc_group = EcGroup::from_curve_name(Nid::SECP384R1).unwrap();
-        let public_point = EcPoint::new(&ecc_group).unwrap();
         let mut bn_ctx = BigNumContext::new().unwrap();
 
+        let ecc_group = EcGroup::from_curve_name(Nid::SECP384R1).unwrap();
+
         let private_key_point = Self::create_private_bignum(seed, &ecc_group, &mut bn_ctx);
+        let public_point = Self::create_public_key_point(&private_key_point, &ecc_group, &mut bn_ctx);
+
         let priv_key =
             EcKey::from_private_components(&ecc_group, &private_key_point, &public_point).unwrap();
         priv_key.check_key().unwrap();
+
         let pub_key = priv_key
             .public_key()
             .to_bytes(&ecc_group, PointConversionForm::UNCOMPRESSED, &mut bn_ctx)
@@ -326,10 +338,7 @@ impl MlKem1024EcP384dKey {
 
         dbg!(&pub_key.len());
 
-        Self {
-            _sk: sk,
-            pub_key,
-        }
+        Self { _sk: sk, pub_key }
     }
 }
 
