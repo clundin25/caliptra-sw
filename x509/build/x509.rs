@@ -15,11 +15,11 @@ Abstract:
 use caliptra_common::dice;
 
 use openssl::asn1::{Asn1Object, Asn1OctetString};
-use openssl::bn::BigNumContext;
-use openssl::ec::EcGroup;
+use openssl::bn::{BigNum, BigNumContext};
 use openssl::ec::EcKey;
 use openssl::ec::PointConversionForm;
-use openssl::hash::MessageDigest;
+use openssl::ec::{EcGroup, EcPoint};
+use openssl::hash::{Hasher, MessageDigest};
 use openssl::nid::Nid;
 use openssl::pkey::PKey;
 use openssl::pkey::{Private, Public};
@@ -136,6 +136,45 @@ impl AsymKey for Ecc384AsymKey {
     }
 }
 
+impl Ecc384AsymKey {
+    /// https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hybrid-kems-03#name-nominal-diffie-hellman-grou
+    /// Section 4.4:
+    /// ScalarFromBytes(buf): Maps a byte array buf to a Scalar by first interpreting the contents of buf
+    /// as an unsigned integer and then reducing that integer modulo the group order; this ensures that the
+    /// resulting integer is always an element of the Scalar field
+    fn create_private_bignum(
+        seed: &[u8; 72],
+        group: &EcGroup,
+        bn_ctx: &mut BigNumContext,
+    ) -> BigNum {
+        let mut group_order = BigNum::new().unwrap();
+        group.order(&mut group_order, bn_ctx).unwrap();
+
+        let bn = BigNum::from_slice(seed).unwrap();
+        let mut key_bn = BigNum::new().unwrap();
+        key_bn.nnmod(&bn, &group_order, bn_ctx).unwrap();
+        bn
+    }
+
+    fn from_seed(seed: &[u8; 72]) -> Self {
+        let ecc_group = EcGroup::from_curve_name(Nid::SECP384R1).unwrap();
+        let public_point = EcPoint::new(&ecc_group).unwrap();
+        let mut bn_ctx = BigNumContext::new().unwrap();
+
+        let private_key_point = Self::create_private_bignum(seed, &ecc_group, &mut bn_ctx);
+        let priv_key =
+            EcKey::from_private_components(&ecc_group, &private_key_point, &public_point).unwrap();
+        let pub_key = priv_key
+            .public_key()
+            .to_bytes(&ecc_group, PointConversionForm::UNCOMPRESSED, &mut bn_ctx)
+            .unwrap();
+        Self {
+            priv_key: PKey::from_ec_key(priv_key).unwrap(),
+            pub_key,
+        }
+    }
+}
+
 impl Default for Ecc384AsymKey {
     /// Returns the "default value" for a type.
     fn default() -> Self {
@@ -233,6 +272,70 @@ impl SigningAlgorithm for MlDsa87Algo {
     }
 }
 
+/// Hybrid KEM
+/// ML-KEM 1024 + P-384
+#[derive(Default)]
+pub struct MlKem1024EcP384Algo {}
+
+impl SigningAlgorithm for MlKem1024EcP384Algo {
+    type Digest = Noop;
+    type AsymKey = MlKem1024EcP384dKey;
+    fn digest(&self) -> MessageDigest {
+        todo!()
+    }
+    fn gen_key(&self) -> Self::AsymKey {
+        Self::AsymKey::default()
+    }
+}
+
+pub struct MlKem1024EcP384dKey {
+    sk: [u8; 32],
+    pub_key: Vec<u8>,
+}
+
+impl MlKem1024EcP384dKey {
+    /// Implements https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hybrid-kems-03#section-6.3.1
+    /// 6.3.1. Key generation
+    fn key_gen() -> Self {
+        // Random shared seed, `sk`.
+        let mut sk = [0; 32];
+        let mut rng = rand::thread_rng();
+        rng.fill(&mut sk);
+
+        // Expand `sk` to 136 bits with `SHAKE256`
+        let mut shake = Hasher::new(MessageDigest::shake_256()).unwrap();
+        shake.update(&sk).unwrap();
+
+        let mut expanded = [0; 136];
+        shake.finish_xof(&mut expanded).unwrap();
+
+        // Generate ML_KEM key from first `64` bytes of `expanded`.
+        let ml_kem = MlKem1024Key::from_seed(&expanded[..64].try_into().unwrap());
+        // Generate EC P-384 key from last `62` bytes of `expanded`.
+        let ec_kem = Ecc384AsymKey::from_seed(&expanded[64..].try_into().unwrap());
+        Self {
+            sk,
+            pub_key: Vec::new(),
+        }
+    }
+}
+
+impl Default for MlKem1024EcP384dKey {
+    fn default() -> Self {
+        Self::key_gen()
+    }
+}
+
+impl AsymKey for MlKem1024EcP384dKey {
+    fn pub_key(&self) -> &[u8] {
+        todo!()
+    }
+
+    fn priv_key(&self) -> &PKey<Private> {
+        todo!()
+    }
+}
+
 pub struct MlKem1024Key {
     priv_key: PKey<Private>,
     pub_key: Vec<u8>,
@@ -262,14 +365,10 @@ impl AsymKey for MlKem1024Key {
     }
 }
 
-impl Default for MlKem1024Key {
-    /// Returns the "default value" for a type.
-    fn default() -> Self {
-        let mut random_bytes: [u8; 64] = [0; 64];
-        let mut rng = rand::thread_rng();
-        rng.fill(&mut random_bytes);
+impl MlKem1024Key {
+    fn from_seed(seed: &[u8; 64]) -> Self {
         let pk_builder =
-            PKeyMlKemBuilder::<Private>::from_seed(MlKemVariant::MlKem1024, &random_bytes).unwrap();
+            PKeyMlKemBuilder::<Private>::from_seed(MlKemVariant::MlKem1024, seed).unwrap();
         let private_key = pk_builder.build().unwrap();
         let public_params = PKeyMlKemParams::<Public>::from_pkey(&private_key).unwrap();
         let public_key = public_params.public_key().unwrap();
@@ -277,6 +376,16 @@ impl Default for MlKem1024Key {
             priv_key: private_key,
             pub_key: public_key.to_vec(),
         }
+    }
+}
+
+impl Default for MlKem1024Key {
+    /// Returns the "default value" for a type.
+    fn default() -> Self {
+        let mut random_bytes: [u8; 64] = [0; 64];
+        let mut rng = rand::thread_rng();
+        rng.fill(&mut random_bytes);
+        Self::from_seed(&random_bytes)
     }
 }
 

@@ -217,7 +217,7 @@ fn gen_rt_alias_cert(out_dir: &str) {
 /// Generate OCP LOCK HPKE Endorsement Certificate Templates
 #[cfg(feature = "generate_templates")]
 fn gen_ocp_lock_endorsement_cert(out_dir: &str) {
-    use x509::{HPKEIdentifiers, MlKem1024Algo};
+    use x509::{HPKEIdentifiers, MlKem1024Algo, MlKem1024EcP384dKey};
     let mut usage = KeyUsage::default();
     // 4.2.2.1.3
     // In addition, the X.509 extended attributes SHALL:
@@ -279,4 +279,6 @@ fn gen_ocp_lock_endorsement_cert(out_dir: &str) {
         "Caliptra 2.0 MlDsa87 Rt Alias",
     );
     CodeGen::gen_code("OcpLockEcdh384CertTbsMlDsa87", template, out_dir);
+
+    MlKem1024EcP384dKey::default();
 }
