@@ -162,7 +162,9 @@ impl Ecc384AsymKey {
         bn_ctx: &mut BigNumContext,
     ) -> EcPoint {
         let mut public_point = EcPoint::new(ecc_group).unwrap();
-        public_point.mul_generator(ecc_group, &private_key_point, bn_ctx).unwrap();
+        public_point
+            .mul_generator(ecc_group, &private_key_point, bn_ctx)
+            .unwrap();
         public_point
     }
 
@@ -172,7 +174,8 @@ impl Ecc384AsymKey {
         let ecc_group = EcGroup::from_curve_name(Nid::SECP384R1).unwrap();
 
         let private_key_point = Self::create_private_bignum(seed, &ecc_group, &mut bn_ctx);
-        let public_point = Self::create_public_key_point(&private_key_point, &ecc_group, &mut bn_ctx);
+        let public_point =
+            Self::create_public_key_point(&private_key_point, &ecc_group, &mut bn_ctx);
 
         let priv_key =
             EcKey::from_private_components(&ecc_group, &private_key_point, &public_point).unwrap();
@@ -295,9 +298,6 @@ pub struct MlKem1024EcP384Algo {}
 impl SigningAlgorithm for MlKem1024EcP384Algo {
     type Digest = Noop;
     type AsymKey = MlKem1024EcP384dKey;
-    fn digest(&self) -> MessageDigest {
-        todo!()
-    }
     fn gen_key(&self) -> Self::AsymKey {
         Self::AsymKey::default()
     }
@@ -305,6 +305,7 @@ impl SigningAlgorithm for MlKem1024EcP384Algo {
 
 pub struct MlKem1024EcP384dKey {
     _sk: [u8; 32],
+    ml_kem: MlKem1024Key,
     pub_key: Vec<u8>,
 }
 
@@ -327,18 +328,22 @@ impl MlKem1024EcP384dKey {
         // Generate ML_KEM key from first `64` bytes of `expanded`.
         let ml_kem = MlKem1024Key::from_seed(&expanded[..64].try_into().unwrap());
         // Generate EC P-384 key from last `62` bytes of `expanded`.
-        let ec_kem = Ecc384AsymKey::from_seed(&expanded[64..].try_into().unwrap());
+        let ec_key = Ecc384AsymKey::from_seed(&expanded[64..].try_into().unwrap());
 
         // From KeyGen algorithm:
         // return sk, concat(pq_PK, trad_PK)
         let mut pub_key = Vec::new();
         pub_key.extend_from_slice(ml_kem.pub_key());
-        dbg!(ec_kem.pub_key().len());
-        pub_key.extend_from_slice(ec_kem.pub_key());
+        dbg!(ec_key.pub_key().len());
+        pub_key.extend_from_slice(ec_key.pub_key());
 
         dbg!(&pub_key.len());
 
-        Self { _sk: sk, pub_key }
+        Self {
+            _sk: sk,
+            ml_kem,
+            pub_key,
+        }
     }
 }
 
@@ -350,11 +355,11 @@ impl Default for MlKem1024EcP384dKey {
 
 impl AsymKey for MlKem1024EcP384dKey {
     fn pub_key(&self) -> &[u8] {
-        &self.pub_key
+        &self.ml_kem.pub_key
     }
 
     fn priv_key(&self) -> &PKey<Private> {
-        todo!("[clundin]: This requires a change to the trait but we never need to sign anything with this key type anyway")
+        &self.ml_kem.priv_key
     }
 }
 
