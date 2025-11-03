@@ -31,7 +31,7 @@ use caliptra_cfi_derive_git::cfi_impl_fn;
 use caliptra_cfi_lib_git::{cfi_assert, cfi_assert_eq, cfi_assert_eq_12_words, cfi_launder};
 use caliptra_common::cfi_check;
 use caliptra_common::mailbox_api::AddSubjectAltNameReq;
-use caliptra_drivers::Dma;
+use caliptra_drivers::{Dma};
 use caliptra_drivers::{
     cprintln, hand_off::DataStore, pcr_log::RT_FW_JOURNEY_PCR, sha2_512_384::Sha2DigestOpTrait,
     Aes, Array4x12, CaliptraError, CaliptraResult, Ecc384, Hmac, KeyId, KeyVault, Lms, Mldsa87,
