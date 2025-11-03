@@ -47,7 +47,7 @@ use caliptra_registers::{
     pv::PvReg, sha256::Sha256Reg, sha512::Sha512Reg, sha512_acc::Sha512AccCsr, soc_ifc::SocIfcReg,
     soc_ifc_trng::SocIfcTrngReg,
 };
-use caliptra_x509::{NotAfter, NotBefore};
+use caliptra_x509::{Ecdsa384CertBuilder, Ecdsa384Signature, MlDsa87CertBuilder, MlDsa87Signature, NotAfter, NotBefore, OcpLockEcdh384CertTbsEcc384, OcpLockEcdh384CertTbsEcc384Params, OcpLockEcdh384CertTbsMlDsa87, OcpLockEcdh384CertTbsMlDsa87Params, OcpLockMlKemCertTbsEcc384, OcpLockMlKemCertTbsEcc384Params, OcpLockMlKemCertTbsMlDsa87, OcpLockMlKemCertTbsMlDsa87Params};
 use dpe::context::{Context, ContextState, ContextType};
 use dpe::dpe_instance::DpeInstanceFlags;
 use dpe::tci::TciMeasurement;
@@ -562,6 +562,95 @@ impl Drivers {
 
         // Truncate to actual used size
         drivers.ecc_cert_chain.truncate(cert_chain_size);
+
+        Ok(())
+    }
+
+    #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
+    pub fn create_ocp_lock_endorsement_cert(self: &mut Drivers) -> CaliptraResult<()> {
+        let params = OcpLockMlKemCertTbsEcc384Params {
+            public_key: &[0; 1568usize],
+            subject_sn: &[0; 64usize],
+            issuer_sn: &[0; 64usize],
+            serial_number: &[0; 20usize],
+            subject_key_id: &[0; 20usize],
+            authority_key_id: &[0; 20usize],
+            not_before: &[0; 15usize],
+            not_after: &[0; 15usize],
+        };
+        let tbs = OcpLockMlKemCertTbsEcc384::new(&params);
+        let sig = Ecdsa384Signature::default();
+        let Some(builder) = Ecdsa384CertBuilder::new(tbs.tbs(), &sig) else {
+            return Err(CaliptraError::RUNTIME_INTERNAL);
+        };
+
+        let mut cert = [0; 1200];
+        let Some(size) = builder.build(&mut cert) else {
+            return Err(CaliptraError::RUNTIME_INTERNAL);
+        };
+
+        let params = OcpLockMlKemCertTbsMlDsa87Params {
+            public_key: &[0; 1568usize],
+            subject_sn: &[0; 64usize],
+            issuer_sn: &[0; 64usize],
+            serial_number: &[0; 20usize],
+            subject_key_id: &[0; 20usize],
+            authority_key_id: &[0; 20usize],
+            not_before: &[0; 15usize],
+            not_after: &[0; 15usize],
+        };
+        let tbs = OcpLockMlKemCertTbsMlDsa87::new(&params);
+        let sig = MlDsa87Signature::default();
+        let Some(builder) = MlDsa87CertBuilder::new(tbs.tbs(), &sig) else {
+            return Err(CaliptraError::RUNTIME_INTERNAL);
+        };
+
+        let mut cert = [0; 15000];
+        let Some(size) = builder.build(&mut cert) else {
+            return Err(CaliptraError::RUNTIME_INTERNAL);
+        };
+
+        let params = OcpLockEcdh384CertTbsMlDsa87Params {
+            public_key: &[0; 97usize],
+            subject_sn: &[0; 64usize],
+            issuer_sn: &[0; 64usize],
+            serial_number: &[0; 20usize],
+            subject_key_id: &[0; 20usize],
+            authority_key_id: &[0; 20usize],
+            not_before: &[0; 15usize],
+            not_after: &[0; 15usize],
+        };
+        let tbs = OcpLockEcdh384CertTbsMlDsa87::new(&params);
+        let sig = MlDsa87Signature::default();
+        let Some(builder) = MlDsa87CertBuilder::new(tbs.tbs(), &sig) else {
+            return Err(CaliptraError::RUNTIME_INTERNAL);
+        };
+
+        let mut cert = [0; 15000];
+        let Some(size) = builder.build(&mut cert) else {
+            return Err(CaliptraError::RUNTIME_INTERNAL);
+        };
+
+        let params = OcpLockEcdh384CertTbsEcc384Params {
+            public_key: &[0; 97usize],
+            subject_sn: &[0; 64usize],
+            issuer_sn: &[0; 64usize],
+            serial_number: &[0; 20usize],
+            subject_key_id: &[0; 20usize],
+            authority_key_id: &[0; 20usize],
+            not_before: &[0; 15usize],
+            not_after: &[0; 15usize],
+        };
+        let tbs = OcpLockEcdh384CertTbsEcc384::new(&params);
+        let sig = Ecdsa384Signature::default();
+        let Some(builder) = Ecdsa384CertBuilder::new(tbs.tbs(), &sig) else {
+            return Err(CaliptraError::RUNTIME_INTERNAL);
+        };
+
+        let mut cert = [0; 4096];
+        let Some(size) = builder.build(&mut cert) else {
+            return Err(CaliptraError::RUNTIME_INTERNAL);
+        };
 
         Ok(())
     }

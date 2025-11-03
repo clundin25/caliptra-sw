@@ -99,7 +99,8 @@ fn real_main() -> io::Result<()> {
         // we can't guarantee linear history even after squashing, so we can't check here
     }
 
-    let git_commits = worktree.commit_log()?;
+    let mut git_commits = worktree.commit_log()?;
+    git_commits.truncate(3);
 
     env::set_current_dir(worktree.path)?;
 

@@ -487,6 +487,8 @@ pub fn handle_mailbox_commands(drivers: &mut Drivers) -> CaliptraResult<()> {
     drivers.soc_ifc.assert_ready_for_runtime();
     caliptra_drivers::report_boot_status(RtBootStatus::RtReadyForCommands.into());
 
+    drivers.create_ocp_lock_endorsement_cert();
+
     // Disable attestation if in the middle of executing an mbox cmd during warm reset
     let command_was_running = drivers.persistent_data.get().runtime_cmd_active.get();
     if command_was_running {
