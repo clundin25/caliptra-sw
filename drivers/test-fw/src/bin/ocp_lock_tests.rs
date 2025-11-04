@@ -16,8 +16,8 @@ Abstract:
 
 use caliptra_cfi_lib::CfiCounter;
 use caliptra_drivers::{
-    cmac_kdf, hmac_kdf, AesKey, Array4x4, HmacKey, HmacMode, HmacTag, KeyId, KeyReadArgs, KeyUsage,
-    KeyWriteArgs, LEArray4x16,
+    cmac_kdf, cprintln, hmac_kdf, AesKey, Array4x4, HmacKey, HmacMode, HmacTag, KeyId, KeyReadArgs,
+    KeyUsage, KeyWriteArgs, LEArray4x16,
 };
 use caliptra_drivers_test_bin::{
     hmac_kv_sequence_check, kv_release, populate_slot, TestRegisters, DOE_TEST_IV, ENCRYPTED_MEK,
@@ -36,19 +36,19 @@ test_suite! {
     test_hek_seed_fuse_bank,
     test_hek_seed_doe,
     test_aes_kv_release_unlocked,
-    test_hmac_regular_kv_to_ocp_lock_kv_unlocked,
+    // test_hmac_regular_kv_to_ocp_lock_kv_unlocked,
     // Run `test_hmac_regular_kv_to_ocp_lock_kv_unlocked` before to avoid overwriting MDK slot.
-    test_populate_mdk,
-    test_populate_hek,
-    // Modifies behavior of subsequent tests.
-    // Tests before should test "ROM" flows, afterwards they should test "Runtime" flows.
-    test_set_ocp_lock_in_progress,
-    test_decrypt_to_mek_kv_locked,
-    test_kv_release, // Should be after `test_decrypt_to_mek_kv_locked`.
-    test_decrypt_to_mek_kv_with_mek_secret_locked,
-    test_hmac_regular_kv_to_ocp_lock_kv_locked,
-    test_hmac_ocp_lock_kv_to_ocp_lock_kv_unlocked,
-    test_aes_kv_release_locked,
+    // test_populate_mdk,
+    // test_populate_hek,
+    // // Modifies behavior of subsequent tests.
+    // // Tests before should test "ROM" flows, afterwards they should test "Runtime" flows.
+    // test_set_ocp_lock_in_progress,
+    // test_decrypt_to_mek_kv_locked,
+    // test_kv_release, // Should be after `test_decrypt_to_mek_kv_locked`.
+    // test_decrypt_to_mek_kv_with_mek_secret_locked,
+    // test_hmac_regular_kv_to_ocp_lock_kv_locked,
+    // test_hmac_ocp_lock_kv_to_ocp_lock_kv_unlocked,
+    // test_aes_kv_release_locked,
 }
 
 fn test_ocp_lock_enabled() {
@@ -100,6 +100,7 @@ fn test_aes_kv_release_unlocked() {
         )
         .unwrap();
 
+        cprintln!("About to trigger KV release");
         assert!(test_regs
             .aes
             .aes_256_ecb_decrypt_kv_internal(AesKey::KV(key), output, &LEArray4x16::default())

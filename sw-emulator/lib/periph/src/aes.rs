@@ -154,6 +154,7 @@ impl AesRegs {
     }
 
     fn write_trigger(&mut self, size: RvSize, val: RvData) -> Result<(), BusError> {
+        eprintln!("Write trigger fired AES");
         // Writes have to be word-aligned
         if size != RvSize::Word {
             Err(BusError::StoreAccessFault)?
@@ -321,6 +322,7 @@ impl AesRegs {
     }
 
     fn update_ecb(&mut self, data: &[u8]) {
+        eprintln!("Called update_ecb!");
         assert_eq!(data.len(), 16);
         let data: &[u8; 16] = data.try_into().unwrap();
         let mut data = GenericArray::from(*data);

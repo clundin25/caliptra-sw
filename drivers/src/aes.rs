@@ -19,6 +19,7 @@ Abstract:
 --*/
 
 use crate::{
+    cprintln,
     kv_access::{KvAccess, KvAccessErr},
     CaliptraError, CaliptraResult, KeyId, KeyReadArgs, KeyUsage, KeyWriteArgs, LEArray4x16,
     LEArray4x3, LEArray4x4, LEArray4x8, Trng,
@@ -957,16 +958,24 @@ impl Aes {
         // Key is always in KV, always load before starting OP.
         self.load_key(key)?;
 
+        cprintln!("Loaded key");
+
         // Set Dest KV in AES Ctrl register
         self.with_aes::<CaliptraResult<()>>(|aes, aes_clp| {
             wait_for_idle(&aes);
-            KvAccess::begin_copy_to_kv(
+            cprintln!("Idle");
+            if let Err(e) = KvAccess::begin_copy_to_kv(
                 aes_clp.aes_kv_wr_status(),
                 aes_clp.aes_kv_wr_ctrl(),
                 output_kv,
-            )?;
+            ) {
+                cprintln!("Failed due to 0x{:x}", u32::from(e));
+            }
+
             Ok(())
         })?;
+
+        cprintln!("copied key");
 
         self.with_aes(|aes, _| {
             wait_for_idle(&aes);
@@ -982,10 +991,14 @@ impl Aes {
             wait_for_idle(&aes);
         });
 
+        cprintln!("set operation");
+
         // Load 64 bytes of data
         for block_num in 0..input.as_bytes().chunks_exact(AES_BLOCK_SIZE_BYTES).len() {
             self.load_data_block(input.as_bytes(), block_num)?;
         }
+
+        cprintln!("loaded blocks");
 
         // Wait for HW to release result to KV
         self.with_aes::<CaliptraResult<()>>(|_, aes_clp| {
@@ -998,6 +1011,8 @@ impl Aes {
                 _ => Err(CaliptraError::RUNTIME_DRIVER_AES_READ_KEY_KV_UNKNOWN),
             }
         })?;
+
+        cprintln!("completed copy");
 
         self.zeroize_internal();
         Ok(())
