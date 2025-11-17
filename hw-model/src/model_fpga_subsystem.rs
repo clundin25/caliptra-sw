@@ -1552,7 +1552,7 @@ impl HwModel for ModelFpgaSubsystem {
         gpio.set(current | 1 << 30);
 
         let start_count = m.cycle_count();
-        const MCU_MAX_BOOT_CYCLES: u64 = 20_000_000;
+        const MCU_MAX_BOOT_CYCLES: u64 = 50_000_000;
 
         while !m
             .mci_boot_milestones()
@@ -1678,12 +1678,16 @@ impl HwModel for ModelFpgaSubsystem {
         // self.setup_mailbox_users(boot_params.valid_axi_user.as_slice())
         //     .map_err(ModelError::from)?;
 
-        self.upload_firmware_rri(
+        self.put_firmware_in_rri(
             boot_params.fw_image.unwrap(),
             boot_params.soc_manifest,
             Some(&mcu_fw_image),
         )
         .unwrap();
+
+        if boot_params.boot_runtime {
+            self.upload_firmware_rri().unwrap();
+        }
 
         Ok(())
     }
@@ -1721,11 +1725,16 @@ impl HwModel for ModelFpgaSubsystem {
 
     fn put_firmware_in_rri(
         &mut self,
-        _firmware: &[u8],
-        _soc_manifest: Option<&[u8]>,
-        _mcu_firmware: Option<&[u8]>,
+        firmware: &[u8],
+        soc_manifest: Option<&[u8]>,
+        mcu_firmware: Option<&[u8]>,
     ) -> Result<(), ModelError> {
-        // ironically, we don't need to support this
+        // Stash firmware so it can later be loaded by the model.
+        self.bmc.push_recovery_image(firmware.to_vec());
+        self.bmc
+            .push_recovery_image(soc_manifest.unwrap_or_default().to_vec());
+        self.bmc
+            .push_recovery_image(mcu_firmware.unwrap_or_default().to_vec());
         Ok(())
     }
 
@@ -1734,20 +1743,9 @@ impl HwModel for ModelFpgaSubsystem {
         true
     }
 
-    fn upload_firmware_rri(
-        &mut self,
-        firmware: &[u8],
-        soc_manifest: Option<&[u8]>,
-        mcu_firmware: Option<&[u8]>,
-    ) -> Result<(), ModelError> {
+    fn upload_firmware_rri(&mut self) -> Result<(), ModelError> {
         println!("Setting recovery images to BMC");
         // First add image to BMC
-        self.bmc.push_recovery_image(firmware.to_vec());
-        self.bmc
-            .push_recovery_image(soc_manifest.unwrap_or_default().to_vec());
-        self.bmc
-            .push_recovery_image(mcu_firmware.unwrap_or_default().to_vec());
-
         while !self.i3c_target_configured() {
             self.step();
         }

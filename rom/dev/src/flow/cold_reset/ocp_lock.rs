@@ -5,6 +5,7 @@ use caliptra_api::mailbox::{
 };
 use caliptra_cfi_lib::{cfi_assert, cfi_assert_bool, cfi_launder};
 use caliptra_common::{
+    cprintln,
     crypto::Crypto,
     keyids::{
         ocp_lock::{KEY_ID_HEK, KEY_ID_MDK},
@@ -109,6 +110,7 @@ pub fn handle_report_hek_metadata(
 /// If HEK is unavailable, erase HEK.
 fn zeroize_hek_if_needed(pdata: &mut PersistentData, kv: &mut KeyVault) -> CaliptraResult<()> {
     if cfi_launder(pdata.ocp_lock_metadata.hek_available) {
+        cprintln!("Hek is available");
         return Ok(());
     } else {
         cfi_assert!(!pdata.ocp_lock_metadata.hek_available)

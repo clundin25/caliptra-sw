@@ -355,6 +355,8 @@ pub struct BootParams<'a> {
     pub soc_manifest: Option<&'a [u8]>,
     // MCU firmware image passed via the recovery interface
     pub mcu_fw_image: Option<&'a [u8]>,
+    // Load RT firmware automatically
+    pub boot_runtime: bool,
 }
 
 impl Default for BootParams<'_> {
@@ -369,6 +371,7 @@ impl Default for BootParams<'_> {
             wdt_timeout_cycles: EXPECTED_CALIPTRA_BOOT_TIME_IN_CYCLES,
             soc_manifest: Default::default(),
             mcu_fw_image: Default::default(),
+            boot_runtime: true,
         }
     }
 }
@@ -721,11 +724,12 @@ pub trait HwModel: SocManager {
                 }
             )?;
             if subsystem_mode {
-                self.upload_firmware_rri(
-                    fw_image,
+                self.put_firmware_in_rri(
+                    boot_params.fw_image.unwrap(),
                     boot_params.soc_manifest,
                     boot_params.mcu_fw_image,
                 )?;
+                self.upload_firmware_rri()?;
             } else {
                 self.upload_firmware(fw_image)?;
             }
@@ -1172,13 +1176,7 @@ pub trait HwModel: SocManager {
     ) -> Result<(), ModelError>;
 
     /// Upload fw image to RRI.
-    fn upload_firmware_rri(
-        &mut self,
-        firmware: &[u8],
-        soc_manifest: Option<&[u8]>,
-        mcu_firmware: Option<&[u8]>,
-    ) -> Result<(), ModelError> {
-        self.put_firmware_in_rri(firmware, soc_manifest, mcu_firmware)?;
+    fn upload_firmware_rri(&mut self) -> Result<(), ModelError> {
         let response = self.mailbox_execute(RI_DOWNLOAD_FIRMWARE_OPCODE, &[])?;
         if response.is_some() {
             return Err(ModelError::UploadFirmwareUnexpectedResponse);

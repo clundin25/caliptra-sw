@@ -104,12 +104,13 @@ pub fn test_upload_firmware<T: HwModel>(
 ) {
     if model.subsystem_mode() {
         model
-            .upload_firmware_rri(
+            .put_firmware_in_rri(
                 fw_image,
                 Some(&default_soc_manifest_bytes(pqc_key_type, 1)),
                 Some(DEFAULT_MCU_FW),
             )
             .unwrap();
+        model.upload_firmware_rri().unwrap();
     } else {
         model.upload_firmware(fw_image).unwrap();
     }
@@ -289,6 +290,7 @@ pub fn start_rt_test_pqc_model(
             initial_dbg_manuf_service_reg: boot_flags,
             soc_manifest,
             mcu_fw_image,
+            boot_runtime: !args.successful_reach_rt,
             ..Default::default()
         },
     )
