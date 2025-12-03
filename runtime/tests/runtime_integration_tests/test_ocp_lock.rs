@@ -1,13 +1,14 @@
 // Licensed under the Apache-2.0 license
 
 use caliptra_api::mailbox::{
-    CommandId, MailboxReq, MailboxReqHeader, ReportHekMetadataReq, ReportHekMetadataResp,
-    ReportHekMetadataRespFlags,
+    CommandId, GetIdevCsrReq, GetIdevCsrResp, GetIdevEcc384CertReq, MailboxReq, MailboxReqHeader,
+    ReportHekMetadataReq, ReportHekMetadataResp, ReportHekMetadataRespFlags,
 };
 use caliptra_builder::firmware::runtime_tests;
-use caliptra_drivers::HekSeedState;
+use caliptra_drivers::{HekSeedState, MfgFlags};
 use caliptra_hw_model::{DefaultHwModel, HwModel};
 use caliptra_image_types::FwVerificationPqcKeyType;
+use caliptra_test::derive::{DoeInput, DoeOutput, IDevId};
 use dpe::U8Bool;
 use zerocopy::{FromBytes, IntoBytes};
 
@@ -69,4 +70,54 @@ fn test_hek_available() {
     let expected_val = U8Bool::new(true);
     let resp = model.mailbox_execute(0xF100_0000, &[]).unwrap().unwrap();
     assert_eq!(resp.as_bytes(), expected_val.as_bytes());
+}
+
+#[cfg_attr(not(feature = "fpga_subsystem"), ignore)]
+#[test]
+/// Verifies the contents of the HEK & MDK KVs match what we expect.
+/// ROM is responsible for populating these KVs
+fn test_validate_rom_keyladder() {
+    let rom_callback = move |model: &mut DefaultHwModel| {
+        let mut cmd = MailboxReq::ReportHekMetadata(ReportHekMetadataReq {
+            hdr: MailboxReqHeader { chksum: 0 },
+            seed_state: HekSeedState::Programmed.into(),
+            ..Default::default()
+        });
+        cmd.populate_chksum().unwrap();
+
+        let response = model
+            .mailbox_execute(
+                CommandId::REPORT_HEK_METADATA.into(),
+                cmd.as_bytes().unwrap(),
+            )
+            .unwrap()
+            .unwrap();
+
+        let response = ReportHekMetadataResp::ref_from_bytes(response.as_bytes()).unwrap();
+        assert!(response
+            .flags
+            .contains(ReportHekMetadataRespFlags::HEK_AVAILABLE));
+
+        let cmd = MailboxReqHeader {
+            chksum: caliptra_common::checksum::calc_checksum(
+                u32::from(CommandId::GET_IDEV_ECC384_CSR),
+                &[],
+            ),
+        };
+        let response = model.mailbox_execute(CommandId::GET_IDEV_ECC384_CSR.into(), cmd.as_bytes()).unwrap().unwrap();
+        let response = GetIdevCsrResp::ref_from_bytes(response.as_bytes()).unwrap();
+    };
+
+    let mut model = run_rt_test(RuntimeTestArgs {
+        test_fwid: Some(&runtime_tests::MBOX_FPGA),
+        // This test assumes OCP LOCK is always enabled.
+        ocp_lock_en: true,
+        test_mfg_flags: Some(MfgFlags::GENERATE_IDEVID_CSR),
+        key_type: Some(FwVerificationPqcKeyType::MLDSA),
+        rom_callback: Some(Box::new(rom_callback)),
+        ..Default::default()
+    });
+
+    let doe_out = DoeOutput::generate(&DoeInput::default());
+    let generated_idevid = IDevId::derive(&doe_out);
 }

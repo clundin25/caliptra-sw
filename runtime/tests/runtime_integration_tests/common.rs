@@ -311,6 +311,8 @@ pub fn start_rt_test_pqc_model(
         0
     };
 
+    dbg!(&boot_flags);
+
     let image = image.to_bytes().unwrap();
 
     let default_manifest_bytes;

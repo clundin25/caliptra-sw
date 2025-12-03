@@ -279,9 +279,11 @@ impl InitDevIdLayer {
         //
         // A flag is asserted via JTAG interface to enable the generation of CSR
         if !env.soc_ifc.mfg_flag_gen_idev_id_csr() {
+            cprintln!("[ROM] CSR flag not set");
             Self::reset_persistent_storage_csrs(env)?;
             return Ok(());
         }
+        cprintln!("[ROM] CSR flag set");
 
         // Generate the CSR
         Self::make_csr_envelop(env, output)
