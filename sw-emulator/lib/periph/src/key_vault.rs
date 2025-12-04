@@ -545,6 +545,9 @@ impl KeyVaultRegs {
         let key_end = key_start + key.len();
         self.keys.data_mut()[key_start..key_end].copy_from_slice(key);
 
+        if key_id == 16 {
+            panic!("Key is: {:?}", key);
+        }
         // Update the key usage.
         key_ctrl_reg.modify(KV_CONTROL::USAGE.val(key_usage));
 

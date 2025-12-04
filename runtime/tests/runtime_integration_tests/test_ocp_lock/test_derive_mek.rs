@@ -27,7 +27,6 @@ const EXPECTED_MEK_CHECKSUM: [u8; 16] = [
 // * MEK and MEK checksum are the same after a warm reset.
 // * MEK and MEK checksum are the same after a hitless update to new firmware.
 
-#[cfg_attr(not(feature = "fpga_subsystem"), ignore)]
 #[test]
 fn test_derive_mek() {
     let mut model = boot_ocp_lock_runtime(OcpLockBootParams {

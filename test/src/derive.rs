@@ -18,7 +18,10 @@ use caliptra_api_types::DeviceLifecycle;
 use caliptra_image_types::FwVerificationPqcKeyType;
 
 use crate::{
-    crypto::{self, derive_ecdsa_key, derive_mldsa_key, hmac384_drbg_keygen, hmac512, hmac512_kdf},
+    crypto::{
+        self, aes256_ecb_decrypt, aes256_ecb_encrypt, cmac_kdf, derive_ecdsa_key, derive_mldsa_key,
+        hmac384_drbg_keygen, hmac512, hmac512_kdf,
+    },
     swap_word_bytes, swap_word_bytes_inplace,
 };
 
@@ -230,6 +233,175 @@ impl IDevId {
     pub fn derive_mldsa_public_key(&self) -> PKey<Public> {
         derive_mldsa_key(&self.mldsa_seed)
     }
+}
+
+pub struct Mek {
+    mek: [u8; 64],
+    checksum: [u8; 16],
+}
+
+pub struct OcpLockKeyLadder {
+    mek_secret_seed: [u32; 16],
+    mdk: [u32; 16],
+}
+
+impl OcpLockKeyLadder {
+    fn derive_mek(&self) -> Mek {
+        let mut mek_secret: [u32; 16] = transmute!(hmac512_kdf(
+            swap_word_bytes(&self.mek_secret_seed).as_bytes(),
+            b"ocp_lock_derived_mek",
+            None,
+        ));
+        swap_word_bytes_inplace(&mut mek_secret);
+
+        let raw_mek_seed = cmac_kdf(
+            swap_word_bytes(&self.mek_secret_seed)
+                .as_bytes()
+                .get(..32)
+                .unwrap(),
+            b"ocp_lock_mek_seed",
+            None,
+            4,
+        );
+
+        let mut mek_seed: [u8; 64] = [0; 64];
+        mek_seed.clone_from_slice(&raw_mek_seed);
+
+        let mut mek_seed: [u32; 16] = transmute!(mek_seed);
+        swap_word_bytes_inplace(&mut mek_seed);
+
+        let key = mek_seed.get(0..8).unwrap().as_bytes();
+        let checksum = aes256_ecb_encrypt(&key, &[0; 16]);
+        let key = self.mdk.get(0..8).unwrap().as_bytes();
+        let decrypted_mek = aes256_ecb_decrypt(&key, mek_seed.as_bytes());
+
+        let mut mek_checksum = [0; 16];
+        mek_checksum.clone_from_slice(&checksum);
+
+        let mut mek = [0; 64];
+        mek.clone_from_slice(&decrypted_mek);
+
+        Mek {
+            mek,
+            checksum: mek_checksum,
+        }
+    }
+}
+
+pub struct OcpLockKeyLadderBuilder {
+    cdi: [u32; 16],
+    hek: Option<[u32; 16]>,
+    mdk: Option<[u32; 16]>,
+    mek_secret_seed: Option<[u32; 16]>,
+}
+
+impl OcpLockKeyLadderBuilder {
+    fn new(idevid: IDevId) -> Self {
+        Self {
+            cdi: idevid.cdi,
+            hek: None,
+            mdk: None,
+            mek_secret_seed: None,
+        }
+    }
+
+    fn add_hek(self, hek_seed: [u32; 8]) -> Self {
+        let mut hek: [u32; 16] = transmute!(hmac512_kdf(
+            swap_word_bytes(&self.cdi).as_bytes(),
+            b"ocp_lock_hek",
+            Some(&hek_seed.as_bytes()),
+        ));
+        swap_word_bytes_inplace(&mut hek);
+        Self {
+            hek: Some(hek),
+            ..self
+        }
+    }
+
+    fn add_mdk(self) -> Self {
+        let mut mdk: [u32; 16] = transmute!(hmac512_kdf(
+            swap_word_bytes(&self.cdi).as_bytes(),
+            b"ocp_lock_mdk",
+            None
+        ));
+        swap_word_bytes_inplace(&mut mdk);
+
+        assert_eq!(
+            [
+                235, 199, 100, 187, 9, 108, 85, 183, 181, 165, 32, 54, 74, 153, 212, 49, 254, 100,
+                91, 250, 138, 250, 113, 81, 251, 144, 189, 177, 125, 28, 105, 60, 192, 236, 24,
+                120, 30, 10, 3, 76, 255, 82, 35, 0, 239, 25, 248, 229, 147, 250, 11, 243, 222, 217,
+                239, 38, 14, 160, 239, 195, 101, 124, 210, 215
+            ],
+            mdk.as_bytes()
+        );
+        Self {
+            mdk: Some(mdk),
+            ..self
+        }
+    }
+
+    fn add_mek_secret_seed(self, sek: [u8; 32], dpk: [u8; 32]) -> Self {
+        let mut epk: [u32; 16] = transmute!(hmac512_kdf(
+            swap_word_bytes(&self.hek.unwrap()).as_bytes(),
+            b"ocp_lock_epk",
+            Some(&sek.as_bytes())
+        ));
+        swap_word_bytes_inplace(&mut epk);
+
+        let mut mek_secret_seed: [u32; 16] = transmute!(hmac512_kdf(
+            swap_word_bytes(&epk).as_bytes(),
+            b"ocp_lock_mek_secret_seed",
+            Some(&dpk.as_bytes()),
+        ));
+        swap_word_bytes_inplace(&mut mek_secret_seed);
+
+        Self {
+            mek_secret_seed: Some(mek_secret_seed),
+            ..self
+        }
+    }
+
+    fn build(self) -> OcpLockKeyLadder {
+        OcpLockKeyLadder {
+            mek_secret_seed: self.mek_secret_seed.unwrap(),
+            mdk: self.mdk.unwrap(),
+        }
+    }
+}
+
+#[test]
+fn test_ocp_lock_keyladder() {
+    let doe_out = DoeOutput::generate(&DoeInput {
+        doe_obf_key: [0xffff_ffff_u32; 8],
+
+        doe_iv: [0xc6b407a2, 0xd119a37d, 0xb7a5bdeb, 0x26214aed],
+
+        uds_seed: [0xffff_ffff_u32; 16],
+        field_entropy_seed: [0xffff_ffff_u32; 8],
+
+        // In debug mode, this defaults to 0xaaaa_aaaa
+        keyvault_initial_word_value: 0xaaaa_aaaa,
+    });
+    let mut generated_idevid = IDevId::derive(&doe_out);
+    let key_ladder = OcpLockKeyLadderBuilder::new(generated_idevid)
+        .add_mdk()
+        .add_hek([0xABDEu32; 8])
+        .add_mek_secret_seed([0xAB; 32], [0xCD; 32])
+        .build();
+    let mek = key_ladder.derive_mek();
+    // assert_eq!(
+    //     generated_idevid.cdi,
+    //     [
+    //         1595302429, 2693222204, 2700750034, 2341068947, 1086336218, 1015077934, 3439704633,
+    //         2756110496, 670106478, 1965056064, 3175014961, 1018544412, 1086626027, 1869434586,
+    //         2638089882, 3209973098
+    //     ]
+    // );
+    assert_eq!(
+        mek.checksum,
+        [148, 197, 93, 201, 212, 248, 17, 47, 160, 241, 99, 239, 3, 116, 53, 194],
+    );
 }
 
 #[test]
