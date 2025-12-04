@@ -232,6 +232,29 @@ impl IDevId {
     }
 }
 
+pub struct OcpLockKeyLadderBuilder {
+    cdi: [u32; 16],
+    hek: Option<[u8; 64]>,
+}
+
+impl OcpLockKeyLadderBuilder {
+    fn new(idevid: IDevId) -> Self {
+        Self {
+            cdi: idevid.cdi,
+            hek: None,
+        }
+    }
+
+    fn add_hek(self, hek_seed: [u8; 32]) -> Self {
+        let hek = Some(hmac512_kdf(
+            self.cdi.as_bytes(),
+            b"ocp_lock_hek",
+            Some(&hek_seed),
+        ));
+        Self { hek, ..self }
+    }
+}
+
 #[test]
 fn test_idevid() {
     let idevid = IDevId::derive(&DoeOutput {
