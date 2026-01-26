@@ -4257,8 +4257,6 @@ impl Response for CmDeriveStableKeyResp {}
 pub struct OcpLockReportHekMetadataReq {
     pub hdr: MailboxReqHeader,
     pub reserved0: u32,
-    pub total_slots: u16,
-    pub active_slots: u16,
     pub seed_state: u16,
     pub padding0: u16,
 }

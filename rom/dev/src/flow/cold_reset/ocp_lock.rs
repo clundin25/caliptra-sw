@@ -91,9 +91,6 @@ pub fn handle_report_hek_metadata(
     let hek_available = hek_seed_state.hek_is_available(lifecycle_state, hek_seed);
 
     pdata.rom.ocp_lock_metadata.hek_available = hek_available;
-    pdata.rom.ocp_lock_metadata.total_hek_seed_slots = req.total_slots;
-    pdata.rom.ocp_lock_metadata.active_hek_seed_slots = req.active_slots;
-    pdata.rom.ocp_lock_metadata.hek_seed_state = req.seed_state;
 
     let mut resp = OcpLockReportHekMetadataResp::default();
     resp.flags.set(

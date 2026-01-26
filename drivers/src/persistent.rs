@@ -284,11 +284,8 @@ pub struct DOT_OWNER_PK_HASH {
 #[derive(TryFromBytes, IntoBytes, KnownLayout, Zeroize)]
 #[repr(C)]
 pub struct OcpLockMetadataRom {
-    pub total_hek_seed_slots: u16,
-    pub active_hek_seed_slots: u16,
-    pub hek_seed_state: u16,
     pub hek_available: bool,
-    reserved: [u8; 1],
+    reserved: [u8; 3],
 }
 
 #[derive(Default, TryFromBytes, IntoBytes, KnownLayout, Zeroize)]
