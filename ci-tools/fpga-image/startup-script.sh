@@ -8,25 +8,18 @@
 # Stop spewing kernel noise to the UART
 echo 3 > /proc/sys/kernel/printk
 
-# TODO(clundin): There are a lot of hacks that get cleaned up if using initrd.
-
 # The VCK-190 image currently always has the same MAC. Do this for now until 
 # a better option is found.
 ip link set dev end0 down
 macchanger -r end0 || true
 ip link set dev end0 up
 
-# Overlay exists so we can proceed.
 if [[ -f "/etc/no_overlayfs" ]]; then
-    echo "Skipping overlayfs setup for development image."
-    mount -o rw,remount /
+    echo "Running in development mode (no overlayfs)."
     systemctl start resize-rootfs
     insmod /home/runner/io-module.ko
     login -f root
-elif grep -q "overlay" /proc/mounts; then
-    mount -o rw,remount /
-
-    # TODO(clundin): Get this at job runtime instead.
+else
     insmod /home/runner/io-module.ko
 
     HOST="google.com"
@@ -35,7 +28,7 @@ elif grep -q "overlay" /proc/mounts; then
       sleep 1
     done
 
-    # Update time. This requires a R/W file system, so it failed earlier.
+    # Update time.
     timedatectl set-ntp true
     systemctl restart systemd-timesyncd
 
@@ -71,34 +64,4 @@ elif grep -q "overlay" /proc/mounts; then
     # are still in the filesystem.
     login -f root
     shutdown -h now
-else
-   # We need to mount the squashfs in an overlayfs. To spare myself more pain
-   # wrestling with petalinux I will mount the overlay here (why not). Eventually
-   # I want to do this the proper way but this will do for now.
-  
-   LOWER_DIR="/mnt/root_base"
-   MERGED_DIR="/mnt/new_root"
-   UPPER_MNT="/mnt/root_overlay"
-
-   UPPER_DIR="${UPPER_MNT}/upper"
-   WORK_DIR="${UPPER_MNT}/work"
-
-   mount --bind / "${LOWER_DIR}"
-   mount -t tmpfs tmpfs "${UPPER_MNT}"
-   mkdir -p "${UPPER_DIR}" "${WORK_DIR}"
-   mount -t overlay overlay \
-     -o lowerdir="${LOWER_DIR}",upperdir="${UPPER_DIR}",workdir="${WORK_DIR}" \
-     "${MERGED_DIR}"
-
-   mount --make-rprivate /
-   for m in dev proc sys run; do
-     mount --move "/${m}" "${MERGED_DIR}/${m}"
-   done
-
-   mkdir -p "${MERGED_DIR}/old_root"
-   cd "${MERGED_DIR}"
-   pivot_root . old_root
-
-   # Recursively call startup-script
-   /usr/bin/startup-script.sh
 fi

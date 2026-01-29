@@ -16,7 +16,7 @@ cp ${KERNEL_MODULE_ARCHIVE}  out/io-module.ko
 if [[ -z "${SKIP_DEBOOTSTRAP}" ]]; then
   (rm -rf out/rootfs || true)
   mkdir -p out/rootfs
-  PACKAGES="git,curl,ca-certificates,locales,libicu72,sudo,vmtouch,fping,rdnssd,dbus,systemd-timesyncd,libboost-regex1.74.0,openocd,gdb-multiarch,macchanger"
+  PACKAGES="git,curl,ca-certificates,locales,libicu72,sudo,vmtouch,fping,rdnssd,dbus,systemd-timesyncd,libboost-regex1.74.0,openocd,gdb-multiarch,macchanger,busybox-static"
   if [[ "$BUILD_DEV_IMAGE" == "true" ]]; then
     PACKAGES="$PACKAGES,ssh,rsync,tmux,cloud-guest-utils"
   fi
@@ -115,6 +115,23 @@ popd
 
 mv out/aarch64-unknown-linux-gnu/release/cargo-nextest out/rootfs/usr/bin/
 
+# Build Initramfs
+mkdir -p out/initramfs/{bin,dev,mnt,proc,sys,sysroot}
+cp out/rootfs/bin/busybox out/initramfs/bin/
+ln -s busybox out/initramfs/bin/sh
+cp initramfs-init out/initramfs/init
+chmod +x out/initramfs/init
+(cd out/initramfs && find . | cpio -H newc -o | gzip > ../initrd.img)
+
+# Build boot.scr
+cat <<EOF > out/boot.cmd
+fatload mmc 0:1 \${kernel_addr_r} Image
+fatload mmc 0:1 \${ramdisk_addr_r} initrd.img
+fatload mmc 0:1 \${fdt_addr_r} system.dtb
+booti \${kernel_addr_r} \${ramdisk_addr_r} \${fdt_addr_r}
+EOF
+mkimage -C none -A arm64 -T script -d out/boot.cmd out/boot.scr
+
 chroot out/rootfs bash -c 'echo ::1 caliptra-fpga >> /etc/hosts'
 cp startup-script.sh out/rootfs/usr/bin/
 chroot out/rootfs systemctl set-default multi-user.target
@@ -198,6 +215,8 @@ trap cleanup2 EXIT
 
 # Write bootfs contents
 tar xvzf out/system-boot.tar.gz -C out/bootfs --no-same-owner
+cp out/boot.scr out/bootfs/
+cp out/initrd.img out/bootfs/
 
 umount out/bootfs
 trap cleanup1 EXIT

@@ -1,0 +1,42 @@
+#!/bin/busybox sh
+
+# Mount essential filesystems
+/bin/busybox mount -t proc proc /proc
+/bin/busybox mount -t sysfs sysfs /sys
+/bin/busybox mount -t devtmpfs devtmpfs /dev
+
+# The root partition is partition 3 on the SD card (mmcblk0)
+ROOT_DEV="/dev/mmcblk0p3"
+
+# Create mount points
+/bin/busybox mkdir -p /mnt/root_base
+/bin/busybox mkdir -p /mnt/root_overlay
+/bin/busybox mkdir -p /sysroot
+
+# Try mounting as ext4 first (for dev image)
+if /bin/busybox mount -t ext4 -o rw $ROOT_DEV /sysroot; then
+    echo "Mounted ext4 rootfs (dev image)"
+else
+    # Fallback to squashfs
+    if /bin/busybox mount -t squashfs -o ro $ROOT_DEV /mnt/root_base; then
+        echo "Mounted squashfs rootfs, setting up overlay"
+        
+        /bin/busybox mount -t tmpfs tmpfs /mnt/root_overlay
+        /bin/busybox mkdir -p /mnt/root_overlay/upper
+        /bin/busybox mkdir -p /mnt/root_overlay/work
+        
+        /bin/busybox mount -t overlay overlay -o lowerdir=/mnt/root_base,upperdir=/mnt/root_overlay/upper,workdir=/mnt/root_overlay/work /sysroot
+    else
+        echo "Failed to mount rootfs from $ROOT_DEV"
+        # Drop to shell for debugging
+        exec /bin/busybox sh
+    fi
+fi
+
+# Move virtual filesystems to the new root
+/bin/busybox mount --move /sys /sysroot/sys
+/bin/busybox mount --move /proc /sysroot/proc
+/bin/busybox mount --move /dev /sysroot/dev
+
+# Switch to the real init
+exec /bin/busybox switch_root /sysroot /lib/systemd/systemd
