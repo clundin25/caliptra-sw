@@ -61,6 +61,7 @@ fn test_clear_key_cache_success() {
     });
 }
 
+#[cfg(not(any(feature = "fpga_realtime", feature = "fpga_subsystem")))]
 #[test]
 fn test_clear_key_cache_ready_timeout() {
     let mut model = boot_ocp_lock_runtime(OcpLockBootParams {
