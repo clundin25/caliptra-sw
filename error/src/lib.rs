@@ -324,6 +324,11 @@ impl CaliptraError {
             "Driver Error: ECC384 hardware error"
         ),
         (
+            DRIVER_ECC384_INVALID_PUBLIC_KEY_FORMAT,
+            0x00050012,
+            "Driver Error: ECC384 invalid public key format"
+        ),
+        (
             DRIVER_MLDSA87_READ_SEED_KV_READ,
             0x00058000,
             "Driver Error: MLDSA87 read seed KV read"

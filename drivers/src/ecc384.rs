@@ -27,6 +27,36 @@ use zeroize::Zeroize;
 /// ECC-384 Coordinate
 pub type Ecc384Scalar = Array4x12;
 
+impl Ecc384Scalar {
+    // Check that `scalar` is in the range [1, n-1] for the P-384 curve
+    fn scalar_range_check(&self) -> bool {
+        // n-1 for The NIST P-384 curve
+        const SECP384_ORDER_MIN1: &[u32] = &[
+            0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xc7634d81,
+            0xf4372ddf, 0x581a0db2, 0x48b0a77a, 0xecec196a, 0xccc52972,
+        ];
+
+        // Check scalar <= n-1
+        for (i, word) in SECP384_ORDER_MIN1.iter().enumerate() {
+            match self.0[i].cmp(word) {
+                Ordering::Greater => return false,
+                Ordering::Less => break,
+                Ordering::Equal => continue,
+            }
+        }
+
+        // If scalar is non-zero, return true
+        for word in self.0 {
+            if word != 0 {
+                return true;
+            }
+        }
+
+        // scalar is zero
+        false
+    }
+}
+
 #[must_use]
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -143,6 +173,31 @@ impl Ecc384PubKey {
     pub fn to_der(&self) -> [u8; 97] {
         array_concat3([0x04], (&self.x).into(), (&self.y).into())
     }
+
+    /// Deserialize a public key from DER format
+    pub fn from_der(der: &[u8; 97]) -> CaliptraResult<Self> {
+        if der[0] != 0x04 {
+            return Err(CaliptraError::DRIVER_ECC384_INVALID_PUBLIC_KEY_FORMAT);
+        }
+
+        let x_bytes: [u8; 48] = der[1..49]
+            .try_into()
+            .map_err(|_| CaliptraError::DRIVER_ECC384_INVALID_PUBLIC_KEY_FORMAT)?;
+        let y_bytes: [u8; 48] = der[49..97]
+            .try_into()
+            .map_err(|_| CaliptraError::DRIVER_ECC384_INVALID_PUBLIC_KEY_FORMAT)?;
+
+        let pub_key = Ecc384PubKey {
+            x: Array4x12::from(x_bytes),
+            y: Array4x12::from(y_bytes),
+        };
+
+        if !&pub_key.x.scalar_range_check() || !&pub_key.y.scalar_range_check() {
+            return Err(CaliptraError::DRIVER_ECC384_SCALAR_RANGE_CHECK_FAILED);
+        }
+
+        Ok(pub_key)
+    }
 }
 
 /// ECC-384 Signature
@@ -176,34 +231,6 @@ pub struct Ecc384 {
 impl Ecc384 {
     pub fn new(ecc: EccReg) -> Self {
         Self { ecc }
-    }
-
-    // Check that `scalar` is in the range [1, n-1] for the P-384 curve
-    fn scalar_range_check(scalar: &Ecc384Scalar) -> bool {
-        // n-1 for The NIST P-384 curve
-        const SECP384_ORDER_MIN1: &[u32] = &[
-            0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xc7634d81,
-            0xf4372ddf, 0x581a0db2, 0x48b0a77a, 0xecec196a, 0xccc52972,
-        ];
-
-        // Check scalar <= n-1
-        for (i, word) in SECP384_ORDER_MIN1.iter().enumerate() {
-            match scalar.0[i].cmp(word) {
-                Ordering::Greater => return false,
-                Ordering::Less => break,
-                Ordering::Equal => continue,
-            }
-        }
-
-        // If scalar is non-zero, return true
-        for word in scalar.0 {
-            if word != 0 {
-                return true;
-            }
-        }
-
-        // scalar is zero
-        false
     }
 
     // Wait on the provided condition OR the error condition defined in this function
@@ -597,7 +624,7 @@ impl Ecc384 {
         }
 
         // If R or S are not in the range [1, N-1], signature check must fail
-        if !Self::scalar_range_check(&signature.r) || !Self::scalar_range_check(&signature.s) {
+        if !signature.r.scalar_range_check() || !signature.s.scalar_range_check() {
             return Err(CaliptraError::DRIVER_ECC384_SCALAR_RANGE_CHECK_FAILED);
         }
 
