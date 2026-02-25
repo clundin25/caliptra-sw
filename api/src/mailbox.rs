@@ -10,7 +10,7 @@ use caliptra_image_types::{
 use caliptra_registers::mbox;
 use core::mem::size_of;
 use ureg::MmioMut;
-use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// Maximum input data size for cryptographic mailbox commands.
 pub const MAX_CMB_DATA_SIZE: usize = 4096;
@@ -43,6 +43,13 @@ const _: () = assert!(CMB_ECDH_CONTEXT_SIZE + 12 + 16 == CMB_ECDH_ENCRYPTED_CONT
 pub const CMB_ECDH_EXCHANGE_DATA_MAX_SIZE: usize = 96; // = 48 * 2;
 const _: () = assert!(CMB_ECDH_CONTEXT_SIZE * 2 == CMB_ECDH_EXCHANGE_DATA_MAX_SIZE);
 pub const CMB_HMAC_MAX_SIZE: usize = 64; // SHA512 digest size
+/// Plaintext size for the CMB SHAKE256 context (u128 session token).
+pub const CMB_SHAKE256_CONTEXT_PLAINTEXT_SIZE: usize = 16;
+/// Encrypted context size for the CMB SHAKE256 commands.
+pub const CMB_SHAKE256_CONTEXT_SIZE: usize = 44; // = plaintext size + 12 bytes IV + 16 bytes tag
+const _: () = assert!(CMB_SHAKE256_CONTEXT_PLAINTEXT_SIZE + 12 + 16 == CMB_SHAKE256_CONTEXT_SIZE);
+/// Maximum digest size for SHAKE256 (64 bytes).
+pub const SHAKE256_MAX_DIGEST_BYTE_SIZE: usize = 64;
 
 /// The max number of HPKE handles that OCP LOCK can manage.
 pub const OCP_LOCK_MAX_HPKE_HANDLES: usize = 3;
@@ -61,6 +68,14 @@ pub const OCP_LOCK_WRAPPED_KEY_MAX_INFO_LEN: usize = 256;
 /// The largest HPKE encapsulated secret of the algorithms supported by OCP LOCK.
 /// Currently the largest algorithm is the hybrid ML-KEM + P-384.
 pub const OCP_LOCK_MAX_ENC_LEN: usize = 1665;
+
+/// Metadata size for encryption engine interaction supported by OCP LOCK
+pub const OCP_LOCK_ENCRYPTION_ENGINE_METADATA_SIZE: usize = 20;
+const _: () = assert!(OCP_LOCK_ENCRYPTION_ENGINE_METADATA_SIZE % size_of::<u32>() == 0);
+
+/// Aux size for encryption engine interaction supported by OCP LOCK
+pub const OCP_LOCK_ENCRYPTION_ENGINE_AUX_SIZE: usize = 32;
+const _: () = assert!(OCP_LOCK_ENCRYPTION_ENGINE_AUX_SIZE % size_of::<u32>() == 0);
 
 #[derive(PartialEq, Eq)]
 pub struct CommandId(pub u32);
@@ -93,7 +108,8 @@ impl CommandId {
     pub const LMS_SIGNATURE_VERIFY: Self = Self(0x4C4D5632); // "LMV2"
     pub const MLDSA87_SIGNATURE_VERIFY: Self = Self(0x4d4c5632); // "MLV2"
     pub const STASH_MEASUREMENT: Self = Self(0x4D454153); // "MEAS"
-    pub const INVOKE_DPE: Self = Self(0x44504543); // "DPEC"
+    pub const INVOKE_DPE_ECC384: Self = Self(0x44504543); // "DPEC"
+    pub const INVOKE_DPE_MLDSA87: Self = Self(0x4450454D); // "DPEM"
     pub const DISABLE_ATTESTATION: Self = Self(0x4453424C); // "DSBL"
     pub const FW_INFO: Self = Self(0x494E464F); // "INFO"
     pub const DPE_TAG_TCI: Self = Self(0x54514754); // "TAGT"
@@ -211,6 +227,9 @@ impl CommandId {
     pub const CM_ECDSA_VERIFY: Self = Self(0x434D_4556); // "CMEV"
     pub const CM_DERIVE_STABLE_KEY: Self = Self(0x494D_4453); // "CMDS"
     pub const CM_SHA: Self = Self(0x434D_5348); // "CMSH"
+    pub const CM_SHAKE256_INIT: Self = Self(0x434D_5849); // "CMXI"
+    pub const CM_SHAKE256_UPDATE: Self = Self(0x434D_5855); // "CMXU"
+    pub const CM_SHAKE256_FINAL: Self = Self(0x434D_5846); // "CMXF"
 
     // OCP LOCK Commands
     pub const OCP_LOCK_REPORT_HEK_METADATA: Self = Self(0x5248_4D54); // "RHMT"
@@ -226,6 +245,9 @@ impl CommandId {
     pub const OCP_LOCK_REWRAP_MPK: Self = Self(0x5245_5750); // "REWP"
     pub const OCP_LOCK_ENABLE_MPK: Self = Self(0x524D_504B); // "RMPK"
     pub const OCP_LOCK_TEST_ACCESS_KEY: Self = Self(0x5441_434B); // "TACK"
+    pub const OCP_LOCK_CLEAR_KEY_CACHE: Self = Self(0x434C_4B43); // "CLKC"
+    pub const OCP_LOCK_GET_STATUS: Self = Self(0x4753_5441); // "GSTA"
+    pub const OCP_LOCK_UNLOAD_MEK: Self = Self(0x554D_454B); // "UMEK"
 
     pub const REALLOCATE_DPE_CONTEXT_LIMITS: Self = Self(0x5243_5458); // "RCTX"
 }
@@ -340,6 +362,8 @@ pub enum MailboxResp {
     CmShaInit(CmShaInitResp),
     CmShaFinal(CmShaFinalResp),
     CmSha(CmShaResp),
+    CmShake256Init(CmShake256InitResp),
+    CmShake256Final(CmShake256FinalResp),
     CmRandomGenerate(CmRandomGenerateResp),
     CmAesEncryptInit(CmAesEncryptInitResp),
     CmAesEncryptUpdate(CmAesResp),
@@ -380,6 +404,9 @@ pub enum MailboxResp {
     OcpLockRewrapMpk(OcpLockRewrapMpkResp),
     OcpLockEnableMpk(OcpLockEnableMpkResp),
     OcpLockTestAccessKey(OcpLockTestAccessKeyResp),
+    OcpLockGetStatus(OcpLockGetStatusResp),
+    OcpLockClearKeyCache(OcpLockClearKeyCacheResp),
+    OcpLockUnloadMek(OcpLockUnloadMekResp),
 }
 
 pub const MAX_RESP_SIZE: usize = size_of::<MailboxResp>();
@@ -416,6 +443,8 @@ impl MailboxResp {
             MailboxResp::CmShaInit(resp) => Ok(resp.as_bytes()),
             MailboxResp::CmShaFinal(resp) => resp.as_bytes_partial(),
             MailboxResp::CmSha(resp) => resp.as_bytes_partial(),
+            MailboxResp::CmShake256Init(resp) => Ok(resp.as_bytes()),
+            MailboxResp::CmShake256Final(resp) => Ok(resp.as_bytes()),
             MailboxResp::CmRandomGenerate(resp) => resp.as_bytes_partial(),
             MailboxResp::CmAesEncryptInit(resp) => resp.as_bytes_partial(),
             MailboxResp::CmAesEncryptUpdate(resp) => resp.as_bytes_partial(),
@@ -456,6 +485,9 @@ impl MailboxResp {
             MailboxResp::OcpLockRewrapMpk(resp) => Ok(resp.as_bytes()),
             MailboxResp::OcpLockEnableMpk(resp) => Ok(resp.as_bytes()),
             MailboxResp::OcpLockTestAccessKey(resp) => Ok(resp.as_bytes()),
+            MailboxResp::OcpLockGetStatus(resp) => Ok(resp.as_bytes()),
+            MailboxResp::OcpLockClearKeyCache(resp) => Ok(resp.as_bytes()),
+            MailboxResp::OcpLockUnloadMek(resp) => Ok(resp.as_bytes()),
         }
     }
 
@@ -490,6 +522,8 @@ impl MailboxResp {
             MailboxResp::CmShaInit(resp) => Ok(resp.as_mut_bytes()),
             MailboxResp::CmShaFinal(resp) => resp.as_bytes_partial_mut(),
             MailboxResp::CmSha(resp) => resp.as_bytes_partial_mut(),
+            MailboxResp::CmShake256Init(resp) => Ok(resp.as_mut_bytes()),
+            MailboxResp::CmShake256Final(resp) => Ok(resp.as_mut_bytes()),
             MailboxResp::CmRandomGenerate(resp) => resp.as_bytes_partial_mut(),
             MailboxResp::CmAesEncryptInit(resp) => resp.as_bytes_partial_mut(),
             MailboxResp::CmAesEncryptUpdate(resp) => resp.as_bytes_partial_mut(),
@@ -530,6 +564,9 @@ impl MailboxResp {
             MailboxResp::OcpLockRewrapMpk(resp) => Ok(resp.as_mut_bytes()),
             MailboxResp::OcpLockEnableMpk(resp) => Ok(resp.as_mut_bytes()),
             MailboxResp::OcpLockTestAccessKey(resp) => Ok(resp.as_mut_bytes()),
+            MailboxResp::OcpLockGetStatus(resp) => Ok(resp.as_mut_bytes()),
+            MailboxResp::OcpLockClearKeyCache(resp) => Ok(resp.as_mut_bytes()),
+            MailboxResp::OcpLockUnloadMek(resp) => Ok(resp.as_mut_bytes()),
         }
     }
 
@@ -594,7 +631,8 @@ pub enum MailboxReq {
     GetLdevEcc384Cert(GetLdevEcc384CertReq),
     GetLdevMldsa87Cert(GetLdevMldsa87CertReq),
     StashMeasurement(StashMeasurementReq),
-    InvokeDpeCommand(InvokeDpeReq),
+    InvokeDpeEcc384Command(InvokeDpeReq),
+    InvokeDpeMldsa87Command(InvokeDpeReq),
     FipsVersion(MailboxReqHeader),
     FwInfo(MailboxReqHeader),
     PopulateIdevEcc384Cert(PopulateIdevEcc384CertReq),
@@ -625,6 +663,9 @@ pub enum MailboxReq {
     CmShaInit(CmShaInitReq),
     CmShaUpdate(CmShaUpdateReq),
     CmShaFinal(CmShaFinalReq),
+    CmShake256Init(CmShake256InitReq),
+    CmShake256Update(CmShake256UpdateReq),
+    CmShake256Final(CmShake256FinalReq),
     CmRandomGenerate(CmRandomGenerateReq),
     CmRandomStir(CmRandomStirReq),
     CmAesEncryptInit(CmAesEncryptInitReq),
@@ -671,6 +712,9 @@ pub enum MailboxReq {
     ExternalMailboxCmd(ExternalMailboxCmdReq),
     FeProg(FeProgReq),
     ReallocateDpeContextLimits(ReallocateDpeContextLimitsReq),
+    OcpLockGetStatus(OcpLockGetStatusReq),
+    OcpLockClearKeyCache(OcpLockClearKeyCacheReq),
+    OcpLockUnloadMek(OcpLockUnloadMekReq),
 }
 
 pub const MAX_REQ_SIZE: usize = size_of::<MailboxReq>();
@@ -683,7 +727,8 @@ impl MailboxReq {
             MailboxReq::LmsVerify(req) => Ok(req.as_bytes()),
             MailboxReq::MldsaVerify(req) => req.as_bytes_partial(),
             MailboxReq::StashMeasurement(req) => Ok(req.as_bytes()),
-            MailboxReq::InvokeDpeCommand(req) => req.as_bytes_partial(),
+            MailboxReq::InvokeDpeEcc384Command(req) => req.as_bytes_partial(),
+            MailboxReq::InvokeDpeMldsa87Command(req) => req.as_bytes_partial(),
             MailboxReq::FipsVersion(req) => Ok(req.as_bytes()),
             MailboxReq::FwInfo(req) => Ok(req.as_bytes()),
             MailboxReq::GetLdevEcc384Cert(req) => Ok(req.as_bytes()),
@@ -716,6 +761,9 @@ impl MailboxReq {
             MailboxReq::CmShaInit(req) => req.as_bytes_partial(),
             MailboxReq::CmShaUpdate(req) => req.as_bytes_partial(),
             MailboxReq::CmShaFinal(req) => req.as_bytes_partial(),
+            MailboxReq::CmShake256Init(req) => req.as_bytes_partial(),
+            MailboxReq::CmShake256Update(req) => req.as_bytes_partial(),
+            MailboxReq::CmShake256Final(req) => req.as_bytes_partial(),
             MailboxReq::CmRandomGenerate(req) => Ok(req.as_bytes()),
             MailboxReq::CmRandomStir(req) => req.as_bytes_partial(),
             MailboxReq::CmAesEncryptInit(req) => req.as_bytes_partial(),
@@ -762,6 +810,9 @@ impl MailboxReq {
             MailboxReq::ExternalMailboxCmd(req) => Ok(req.as_bytes()),
             MailboxReq::FeProg(req) => Ok(req.as_bytes()),
             MailboxReq::ReallocateDpeContextLimits(req) => Ok(req.as_bytes()),
+            MailboxReq::OcpLockGetStatus(req) => Ok(req.as_bytes()),
+            MailboxReq::OcpLockClearKeyCache(req) => Ok(req.as_bytes()),
+            MailboxReq::OcpLockUnloadMek(req) => Ok(req.as_bytes()),
         }
     }
 
@@ -774,7 +825,8 @@ impl MailboxReq {
             MailboxReq::GetLdevEcc384Cert(req) => Ok(req.as_mut_bytes()),
             MailboxReq::GetLdevMldsa87Cert(req) => Ok(req.as_mut_bytes()),
             MailboxReq::StashMeasurement(req) => Ok(req.as_mut_bytes()),
-            MailboxReq::InvokeDpeCommand(req) => req.as_bytes_partial_mut(),
+            MailboxReq::InvokeDpeEcc384Command(req) => req.as_bytes_partial_mut(),
+            MailboxReq::InvokeDpeMldsa87Command(req) => req.as_bytes_partial_mut(),
             MailboxReq::FipsVersion(req) => Ok(req.as_mut_bytes()),
             MailboxReq::FwInfo(req) => Ok(req.as_mut_bytes()),
             MailboxReq::PopulateIdevEcc384Cert(req) => req.as_bytes_partial_mut(),
@@ -805,6 +857,9 @@ impl MailboxReq {
             MailboxReq::CmShaInit(req) => req.as_bytes_partial_mut(),
             MailboxReq::CmShaUpdate(req) => req.as_bytes_partial_mut(),
             MailboxReq::CmShaFinal(req) => req.as_bytes_partial_mut(),
+            MailboxReq::CmShake256Init(req) => req.as_bytes_partial_mut(),
+            MailboxReq::CmShake256Update(req) => req.as_bytes_partial_mut(),
+            MailboxReq::CmShake256Final(req) => req.as_bytes_partial_mut(),
             MailboxReq::CmRandomGenerate(req) => Ok(req.as_mut_bytes()),
             MailboxReq::CmRandomStir(req) => req.as_bytes_partial_mut(),
             MailboxReq::CmAesEncryptInit(req) => req.as_bytes_partial_mut(),
@@ -851,6 +906,9 @@ impl MailboxReq {
             MailboxReq::ExternalMailboxCmd(req) => Ok(req.as_mut_bytes()),
             MailboxReq::FeProg(req) => Ok(req.as_mut_bytes()),
             MailboxReq::ReallocateDpeContextLimits(req) => Ok(req.as_mut_bytes()),
+            MailboxReq::OcpLockGetStatus(req) => Ok(req.as_mut_bytes()),
+            MailboxReq::OcpLockClearKeyCache(req) => Ok(req.as_mut_bytes()),
+            MailboxReq::OcpLockUnloadMek(req) => Ok(req.as_mut_bytes()),
         }
     }
 
@@ -863,7 +921,8 @@ impl MailboxReq {
             MailboxReq::GetLdevEcc384Cert(_) => CommandId::GET_LDEV_ECC384_CERT,
             MailboxReq::GetLdevMldsa87Cert(_) => CommandId::GET_LDEV_MLDSA87_CERT,
             MailboxReq::StashMeasurement(_) => CommandId::STASH_MEASUREMENT,
-            MailboxReq::InvokeDpeCommand(_) => CommandId::INVOKE_DPE,
+            MailboxReq::InvokeDpeEcc384Command(_) => CommandId::INVOKE_DPE_ECC384,
+            MailboxReq::InvokeDpeMldsa87Command(_) => CommandId::INVOKE_DPE_MLDSA87,
             MailboxReq::FipsVersion(_) => CommandId::VERSION,
             MailboxReq::FwInfo(_) => CommandId::FW_INFO,
             MailboxReq::PopulateIdevEcc384Cert(_) => CommandId::POPULATE_IDEV_ECC384_CERT,
@@ -894,6 +953,9 @@ impl MailboxReq {
             MailboxReq::CmShaInit(_) => CommandId::CM_SHA_INIT,
             MailboxReq::CmShaUpdate(_) => CommandId::CM_SHA_UPDATE,
             MailboxReq::CmShaFinal(_) => CommandId::CM_SHA_FINAL,
+            MailboxReq::CmShake256Init(_) => CommandId::CM_SHAKE256_INIT,
+            MailboxReq::CmShake256Update(_) => CommandId::CM_SHAKE256_UPDATE,
+            MailboxReq::CmShake256Final(_) => CommandId::CM_SHAKE256_FINAL,
             MailboxReq::CmRandomGenerate(_) => CommandId::CM_RANDOM_GENERATE,
             MailboxReq::CmRandomStir(_) => CommandId::CM_RANDOM_STIR,
             MailboxReq::CmAesEncryptInit(_) => CommandId::CM_AES_ENCRYPT_INIT,
@@ -946,6 +1008,9 @@ impl MailboxReq {
             MailboxReq::OcpLockRewrapMpk(_) => CommandId::OCP_LOCK_REWRAP_MPK,
             MailboxReq::OcpLockEnableMpk(_) => CommandId::OCP_LOCK_ENABLE_MPK,
             MailboxReq::OcpLockTestAccessKey(_) => CommandId::OCP_LOCK_TEST_ACCESS_KEY,
+            MailboxReq::OcpLockGetStatus(_) => CommandId::OCP_LOCK_GET_STATUS,
+            MailboxReq::OcpLockClearKeyCache(_) => CommandId::OCP_LOCK_CLEAR_KEY_CACHE,
+            MailboxReq::OcpLockUnloadMek(_) => CommandId::OCP_LOCK_UNLOAD_MEK,
         }
     }
 
@@ -1444,11 +1509,11 @@ pub struct CertifyKeyExtendedResp {
     pub certify_key_resp: [u8; CertifyKeyExtendedResp::CERTIFY_KEY_RESP_SIZE],
 }
 impl CertifyKeyExtendedResp {
-    pub const CERTIFY_KEY_RESP_SIZE: usize = 8000;
+    pub const CERTIFY_KEY_RESP_SIZE: usize = 25152;
 }
 impl Response for CertifyKeyExtendedResp {}
 
-// INVOKE_DPE_COMMAND
+// INVOKE_DPE_ECC384
 #[repr(C)]
 #[derive(Debug, IntoBytes, FromBytes, Immutable, KnownLayout, PartialEq, Eq)]
 pub struct InvokeDpeReq {
@@ -1486,7 +1551,49 @@ impl Default for InvokeDpeReq {
     }
 }
 impl Request for InvokeDpeReq {
-    const ID: CommandId = CommandId::INVOKE_DPE;
+    const ID: CommandId = CommandId::INVOKE_DPE_ECC384;
+    type Resp = InvokeDpeResp;
+}
+
+// INVOKE_DPE_MLDSA87
+#[repr(C)]
+#[derive(Debug, IntoBytes, FromBytes, Immutable, KnownLayout, PartialEq, Eq)]
+pub struct InvokeDpeMldsa87Req {
+    pub hdr: MailboxReqHeader,
+    pub data_size: u32,
+    pub data: [u8; InvokeDpeMldsa87Req::DATA_MAX_SIZE], // variable length
+}
+
+impl InvokeDpeMldsa87Req {
+    pub const DATA_MAX_SIZE: usize = InvokeDpeReq::DATA_MAX_SIZE;
+
+    pub fn as_bytes_partial(&self) -> CaliptraResult<&[u8]> {
+        if self.data_size as usize > Self::DATA_MAX_SIZE {
+            return Err(CaliptraError::RUNTIME_MAILBOX_API_REQUEST_DATA_LEN_TOO_LARGE);
+        }
+        let unused_byte_count = Self::DATA_MAX_SIZE - self.data_size as usize;
+        Ok(&self.as_bytes()[..size_of::<Self>() - unused_byte_count])
+    }
+
+    pub fn as_bytes_partial_mut(&mut self) -> CaliptraResult<&mut [u8]> {
+        if self.data_size as usize > Self::DATA_MAX_SIZE {
+            return Err(CaliptraError::RUNTIME_MAILBOX_API_REQUEST_DATA_LEN_TOO_LARGE);
+        }
+        let unused_byte_count = Self::DATA_MAX_SIZE - self.data_size as usize;
+        Ok(&mut self.as_mut_bytes()[..size_of::<Self>() - unused_byte_count])
+    }
+}
+impl Default for InvokeDpeMldsa87Req {
+    fn default() -> Self {
+        Self {
+            hdr: MailboxReqHeader::default(),
+            data_size: 0,
+            data: [0u8; InvokeDpeMldsa87Req::DATA_MAX_SIZE],
+        }
+    }
+}
+impl Request for InvokeDpeMldsa87Req {
+    const ID: CommandId = CommandId::INVOKE_DPE_MLDSA87;
     type Resp = InvokeDpeResp;
 }
 
@@ -1514,7 +1621,7 @@ pub struct InvokeDpeResp {
     pub data: [u8; InvokeDpeResp::DATA_MAX_SIZE], // variable length
 }
 impl InvokeDpeResp {
-    pub const DATA_MAX_SIZE: usize = 8000;
+    pub const DATA_MAX_SIZE: usize = 25152;
 }
 impl ResponseVarSize for InvokeDpeResp {}
 
@@ -2604,6 +2711,174 @@ impl Default for CmShaFinalResp {
 }
 
 impl ResponseVarSize for CmShaFinalResp {}
+
+// CM_SHAKE256_INIT
+#[repr(C)]
+#[derive(Debug, IntoBytes, FromBytes, KnownLayout, Immutable, PartialEq, Eq)]
+pub struct CmShake256InitReq {
+    pub hdr: MailboxReqHeader,
+    pub input_size: u32,
+    pub input: [u8; MAX_CMB_DATA_SIZE],
+}
+
+impl Default for CmShake256InitReq {
+    fn default() -> Self {
+        Self {
+            hdr: MailboxReqHeader::default(),
+            input_size: 0,
+            input: [0u8; MAX_CMB_DATA_SIZE],
+        }
+    }
+}
+
+impl CmShake256InitReq {
+    pub fn as_bytes_partial(&self) -> CaliptraResult<&[u8]> {
+        if self.input_size as usize > MAX_CMB_DATA_SIZE {
+            return Err(CaliptraError::RUNTIME_MAILBOX_API_REQUEST_DATA_LEN_TOO_LARGE);
+        }
+        let unused_byte_count = MAX_CMB_DATA_SIZE - self.input_size as usize;
+        Ok(&self.as_bytes()[..size_of::<Self>() - unused_byte_count])
+    }
+
+    pub fn as_bytes_partial_mut(&mut self) -> CaliptraResult<&mut [u8]> {
+        if self.input_size as usize > MAX_CMB_DATA_SIZE {
+            return Err(CaliptraError::RUNTIME_MAILBOX_API_REQUEST_DATA_LEN_TOO_LARGE);
+        }
+        let unused_byte_count = MAX_CMB_DATA_SIZE - self.input_size as usize;
+        Ok(&mut self.as_mut_bytes()[..size_of::<Self>() - unused_byte_count])
+    }
+}
+
+impl Request for CmShake256InitReq {
+    const ID: CommandId = CommandId::CM_SHAKE256_INIT;
+    type Resp = CmShake256InitResp;
+}
+
+// Note: CmShake256InitResp is also used as the response for CM_SHAKE256_UPDATE,
+// since both return the same encrypted context structure.
+#[repr(C)]
+#[derive(Debug, IntoBytes, FromBytes, KnownLayout, Immutable, PartialEq, Eq)]
+pub struct CmShake256InitResp {
+    pub hdr: MailboxRespHeader,
+    pub context: [u8; CMB_SHAKE256_CONTEXT_SIZE],
+}
+
+impl Default for CmShake256InitResp {
+    fn default() -> Self {
+        Self {
+            hdr: MailboxRespHeader::default(),
+            context: [0u8; CMB_SHAKE256_CONTEXT_SIZE],
+        }
+    }
+}
+
+impl Response for CmShake256InitResp {}
+
+// CM_SHAKE256_UPDATE
+#[repr(C)]
+#[derive(Debug, IntoBytes, FromBytes, KnownLayout, Immutable, PartialEq, Eq)]
+pub struct CmShake256UpdateReq {
+    pub hdr: MailboxReqHeader,
+    pub context: [u8; CMB_SHAKE256_CONTEXT_SIZE],
+    pub input_size: u32,
+    pub input: [u8; MAX_CMB_DATA_SIZE],
+}
+
+impl Default for CmShake256UpdateReq {
+    fn default() -> Self {
+        Self {
+            hdr: MailboxReqHeader::default(),
+            context: [0u8; CMB_SHAKE256_CONTEXT_SIZE],
+            input_size: 0,
+            input: [0u8; MAX_CMB_DATA_SIZE],
+        }
+    }
+}
+
+impl CmShake256UpdateReq {
+    pub fn as_bytes_partial(&self) -> CaliptraResult<&[u8]> {
+        if self.input_size as usize > MAX_CMB_DATA_SIZE {
+            return Err(CaliptraError::RUNTIME_MAILBOX_API_REQUEST_DATA_LEN_TOO_LARGE);
+        }
+        let unused_byte_count = MAX_CMB_DATA_SIZE - self.input_size as usize;
+        Ok(&self.as_bytes()[..size_of::<Self>() - unused_byte_count])
+    }
+
+    pub fn as_bytes_partial_mut(&mut self) -> CaliptraResult<&mut [u8]> {
+        if self.input_size as usize > MAX_CMB_DATA_SIZE {
+            return Err(CaliptraError::RUNTIME_MAILBOX_API_REQUEST_DATA_LEN_TOO_LARGE);
+        }
+        let unused_byte_count = MAX_CMB_DATA_SIZE - self.input_size as usize;
+        Ok(&mut self.as_mut_bytes()[..size_of::<Self>() - unused_byte_count])
+    }
+}
+
+impl Request for CmShake256UpdateReq {
+    const ID: CommandId = CommandId::CM_SHAKE256_UPDATE;
+    type Resp = CmShake256InitResp; // Reuse init response (returns updated context).
+}
+
+// CM_SHAKE256_FINAL
+#[repr(C)]
+#[derive(Debug, IntoBytes, FromBytes, KnownLayout, Immutable, PartialEq, Eq)]
+pub struct CmShake256FinalReq {
+    pub hdr: MailboxReqHeader,
+    pub context: [u8; CMB_SHAKE256_CONTEXT_SIZE],
+    pub input_size: u32,
+    pub input: [u8; MAX_CMB_DATA_SIZE],
+}
+
+impl Default for CmShake256FinalReq {
+    fn default() -> Self {
+        Self {
+            hdr: MailboxReqHeader::default(),
+            context: [0u8; CMB_SHAKE256_CONTEXT_SIZE],
+            input_size: 0,
+            input: [0u8; MAX_CMB_DATA_SIZE],
+        }
+    }
+}
+
+impl CmShake256FinalReq {
+    pub fn as_bytes_partial(&self) -> CaliptraResult<&[u8]> {
+        if self.input_size as usize > MAX_CMB_DATA_SIZE {
+            return Err(CaliptraError::RUNTIME_MAILBOX_API_REQUEST_DATA_LEN_TOO_LARGE);
+        }
+        let unused_byte_count = MAX_CMB_DATA_SIZE - self.input_size as usize;
+        Ok(&self.as_bytes()[..size_of::<Self>() - unused_byte_count])
+    }
+
+    pub fn as_bytes_partial_mut(&mut self) -> CaliptraResult<&mut [u8]> {
+        if self.input_size as usize > MAX_CMB_DATA_SIZE {
+            return Err(CaliptraError::RUNTIME_MAILBOX_API_REQUEST_DATA_LEN_TOO_LARGE);
+        }
+        let unused_byte_count = MAX_CMB_DATA_SIZE - self.input_size as usize;
+        Ok(&mut self.as_mut_bytes()[..size_of::<Self>() - unused_byte_count])
+    }
+}
+
+impl Request for CmShake256FinalReq {
+    const ID: CommandId = CommandId::CM_SHAKE256_FINAL;
+    type Resp = CmShake256FinalResp;
+}
+
+#[repr(C)]
+#[derive(Debug, IntoBytes, FromBytes, KnownLayout, Immutable, PartialEq, Eq)]
+pub struct CmShake256FinalResp {
+    pub hdr: MailboxRespHeader,
+    pub hash: [u8; SHAKE256_MAX_DIGEST_BYTE_SIZE],
+}
+
+impl Default for CmShake256FinalResp {
+    fn default() -> Self {
+        Self {
+            hdr: MailboxRespHeader::default(),
+            hash: [0u8; SHAKE256_MAX_DIGEST_BYTE_SIZE],
+        }
+    }
+}
+
+impl Response for CmShake256FinalResp {}
 
 // CM_SHA (one-shot SHA384/SHA512 hash)
 #[repr(C)]
@@ -4885,6 +5160,75 @@ impl Request for ZeroizeUdsFeReq {
 
 impl Response for ZeroizeUdsFeResp {}
 
+// GET_STATUS
+#[repr(C)]
+#[derive(Debug, Default, IntoBytes, FromBytes, Immutable, KnownLayout, PartialEq, Eq)]
+pub struct OcpLockGetStatusReq {
+    pub hdr: MailboxReqHeader,
+}
+
+impl Request for OcpLockGetStatusReq {
+    const ID: CommandId = CommandId::OCP_LOCK_GET_STATUS;
+    type Resp = OcpLockGetStatusResp;
+}
+
+#[repr(C)]
+#[derive(Debug, Default, IntoBytes, FromBytes, Immutable, KnownLayout, PartialEq, Eq)]
+pub struct OcpLockGetStatusResp {
+    pub hdr: MailboxRespHeader,
+    pub reserved: [u32; 4],
+    pub ctrl_register: u32,
+}
+
+impl Response for OcpLockGetStatusResp {}
+
+// CLEAR_KEY_CACHE
+#[repr(C)]
+#[derive(Debug, Default, IntoBytes, FromBytes, Immutable, KnownLayout, PartialEq, Eq)]
+pub struct OcpLockClearKeyCacheReq {
+    pub hdr: MailboxReqHeader,
+    pub reserved: u32,
+    pub cmd_timeout: u32,
+}
+
+impl Request for OcpLockClearKeyCacheReq {
+    const ID: CommandId = CommandId::OCP_LOCK_CLEAR_KEY_CACHE;
+    type Resp = OcpLockClearKeyCacheResp;
+}
+
+#[repr(C)]
+#[derive(Debug, Default, IntoBytes, FromBytes, Immutable, KnownLayout, PartialEq, Eq)]
+pub struct OcpLockClearKeyCacheResp {
+    pub hdr: MailboxRespHeader,
+    pub reserved: u32,
+}
+
+impl Response for OcpLockClearKeyCacheResp {}
+
+// UNLOAD_MEK
+#[repr(C)]
+#[derive(Debug, Default, IntoBytes, FromBytes, Immutable, KnownLayout, PartialEq, Eq)]
+pub struct OcpLockUnloadMekReq {
+    pub hdr: MailboxReqHeader,
+    pub reserved: u32,
+    pub metadata: [u8; OCP_LOCK_ENCRYPTION_ENGINE_METADATA_SIZE],
+    pub cmd_timeout: u32,
+}
+
+impl Request for OcpLockUnloadMekReq {
+    const ID: CommandId = CommandId::OCP_LOCK_UNLOAD_MEK;
+    type Resp = OcpLockUnloadMekResp;
+}
+
+#[repr(C)]
+#[derive(Debug, Default, IntoBytes, FromBytes, Immutable, KnownLayout, PartialEq, Eq)]
+pub struct OcpLockUnloadMekResp {
+    pub hdr: MailboxRespHeader,
+    pub reserved: u32,
+}
+
+impl Response for OcpLockUnloadMekResp {}
+
 /// Retrieves dlen bytes  from the mailbox.
 pub fn mbox_read_response(
     mbox: mbox::RegisterBlock<impl MmioMut>,
@@ -4906,31 +5250,25 @@ pub fn mbox_read_fifo(
     mbox: mbox::RegisterBlock<impl MmioMut>,
     buf: &mut [u8],
 ) -> core::result::Result<(), CaliptraApiError> {
-    use zerocopy::Unalign;
-
-    fn dequeue_words(mbox: &mbox::RegisterBlock<impl MmioMut>, buf: &mut [Unalign<u32>]) {
-        for word in buf.iter_mut() {
-            *word = Unalign::new(mbox.dataout().read());
-        }
-    }
-
     let dlen_bytes = mbox.dlen().read() as usize;
 
     let buf = buf
         .get_mut(..dlen_bytes)
         .ok_or(CaliptraApiError::UnableToReadMailbox)?;
 
-    let len_words = buf.len() / size_of::<u32>();
-    let (mut buf_words, suffix) = Ref::from_prefix_with_elems(buf, len_words)
-        .map_err(|_| CaliptraApiError::ReadBuffTooSmall)?;
-
-    dequeue_words(&mbox, &mut buf_words);
-    if !suffix.is_empty() {
-        let last_word = mbox.dataout().read();
-        let suffix_len = suffix.len();
-        suffix
-            .as_mut_bytes()
-            .copy_from_slice(&last_word.as_bytes()[..suffix_len]);
+    let mut remaining = &mut buf[..];
+    while remaining.len() >= 4 {
+        let (chunk, rest) = remaining.split_at_mut(4);
+        let word = mbox.dataout().read().to_le_bytes();
+        chunk[0] = word[0];
+        chunk[1] = word[1];
+        chunk[2] = word[2];
+        chunk[3] = word[3];
+        remaining = rest;
+    }
+    if !remaining.is_empty() {
+        let last_word = mbox.dataout().read().to_le_bytes();
+        remaining.copy_from_slice(&last_word[..remaining.len()]);
     }
 
     Ok(())

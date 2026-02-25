@@ -20,6 +20,12 @@ use core::num::{NonZeroU32, TryFromIntError};
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct CaliptraError(pub NonZeroU32);
 
+impl core::fmt::Display for CaliptraError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.error_name().unwrap())
+    }
+}
+
 /// Macro to define error constants ensuring uniqueness
 ///
 /// This macro takes a list of (name, value, doc) tuples and generates
@@ -31,6 +37,15 @@ macro_rules! define_error_constants {
             #[doc = $doc]
             pub const $name: CaliptraError = CaliptraError::new_const($value);
         )*
+
+        pub fn error_name(&self) -> Option<& 'static str> {
+            match self.0.get() {
+                $(
+                    $value => Some(stringify!($name)),
+                )*
+                _ => None,
+            }
+        }
 
         #[cfg(test)]
         /// Returns a vector of all defined error constants for testing uniqueness
@@ -886,6 +901,21 @@ impl CaliptraError {
             IMAGE_VERIFIER_ERR_DOT_OWNER_PUB_KEY_DIGEST_MISMATCH,
             0x000b005e,
             "Image Verifier Error: DOT owner public key digest mismatch"
+        ),
+        (
+            OCP_LOCK_ENGINE_TIMEOUT,
+            0x000b005f,
+            "OCP LOCK Encryption Engine Timeout"
+        ),
+        (
+            OCP_LOCK_ENGINE_ERR,
+            0x000b0060,
+            "OCP LOCK Encryption Engine Command Error"
+        ),
+        (
+            OCP_LOCK_ENGINE_NOT_READY,
+            0x000b0061,
+            "OCP LOCK Encryption Engine Not Ready"
         ),
         (
             DRIVER_LMS_INVALID_LMS_ALGO_TYPE,
@@ -1754,6 +1784,11 @@ impl CaliptraError {
             0x000E008D,
             "Runtime Error: DPE response too large"
         ),
+        (
+            RUNTIME_CM_SHAKE256_CONTEXT_MISMATCH,
+            0x000E008E,
+            "Runtime Error: SHAKE256 context mismatch - SHA3 hardware was used between calls"
+        ),
         // FMC Errors
         (FMC_GLOBAL_NMI, 0x000F0001, "FMC Error: Global NMI"),
         (
@@ -2273,6 +2308,36 @@ impl CaliptraError {
             "ROM KAT Error: ECDH verify failure"
         ),
         (
+            KAT_MLKEM1024_KEY_PAIR_GENERATE_FAILURE,
+            0x900B0001,
+            "ROM KAT Error: MLKEM1024 key pair generate failure"
+        ),
+        (
+            KAT_MLKEM1024_KEY_PAIR_VERIFY_FAILURE,
+            0x900B0002,
+            "ROM KAT Error: MLKEM1024 key pair verify failure"
+        ),
+        (
+            KAT_MLKEM1024_ENCAPSULATE_FAILURE,
+            0x900B0003,
+            "ROM KAT Error: MLKEM1024 encapsulate failure"
+        ),
+        (
+            KAT_MLKEM1024_DECAPSULATE_FAILURE,
+            0x900B0004,
+            "ROM KAT Error: MLKEM1024 decapsulate failure"
+        ),
+        (
+            KAT_MLKEM1024_SHARED_KEY_MISMATCH,
+            0x900B0005,
+            "ROM KAT Error: MLKEM1024 shared key mismatch"
+        ),
+        (
+            KAT_MLKEM1024_CIPHERTEXT_MISMATCH,
+            0x900B0006,
+            "ROM KAT Error: MLKEM1024 ciphertext mismatch"
+        ),
+        (
             KAT_SHA2_512_384_ACC_DIGEST_START_OP_FAILURE,
             0x90050001,
             "ROM KAT Error: SHA2_512_384_ACC digest start op failure"
@@ -2527,23 +2592,48 @@ impl CaliptraError {
         ),
         (
             RUNTIME_DRIVER_HPKE_ML_KEM_TRNG_KEYGEN_FAIL,
-            0xa004_1100,
+            0xa004_1010,
             "Driver Error: HPKE ml-kem failed to generate a key pair due to trng failure"
         ),
         (
             RUNTIME_DRIVER_HPKE_ML_KEM_PKR_DESERIALIZATION_FAIL,
-            0xa004_1101,
+            0xa004_1011,
             "Driver Error: HPKE ml-kem failed to deseriliaze the PKR in setup base s"
         ),
         (
             RUNTIME_DRIVER_HPKE_ML_KEM_ENCAP_SECRET_DESERIALIZATION_FAIL,
-            0xa004_1102,
+            0xa004_1012,
             "Driver Error: HPKE ml-kem failed to deseriliaze the encapsulated secret"
         ),
         (
             RUNTIME_DRIVER_HPKE_ML_KEM_ENCAP_KEY_SERIALIZATION_FAIL,
-            0xa004_1103,
+            0xa004_1013,
             "Driver Error: HPKE ml-kem failed to seriliaze the encap key"
+        ),
+        (
+            RUNTIME_DRIVER_HPKE_P384_ENCAP_KEY_DESERIALIZATION_FAIL,
+            0xa004_1020,
+            "Driver Error: HPKE p-384 failed to deseriliaze the encap key"
+        ),
+        (
+            RUNTIME_DRIVER_HPKE_HYBRID_ENCAP_KEY_DESERIALIZATION_FAIL,
+            0xa004_1030,
+            "Driver Error: HPKE mlkem-1024-p-384 failed to deseriliaze the encap key"
+        ),
+        (
+            RUNTIME_DRIVER_HPKE_HYBRID_ENCAP_KEY_SERIALIZATION_FAIL,
+            0xa004_1031,
+            "Driver Error: HPKE mlkem-1024-p-384 failed to seriliaze the encap key"
+        ),
+        (
+            RUNTIME_DRIVER_HPKE_HYBRID_ENC_SERIALIZATION_FAIL,
+            0xa004_1032,
+            "Driver Error: HPKE mlkem-1024-p-384 failed to seriliaze the encapsulated secret"
+        ),
+        (
+            RUNTIME_DRIVER_HPKE_HYBRID_ENC_DESERIALIZATION_FAIL,
+            0xa004_1033,
+            "Driver Error: HPKE mlkem-1024-p-384 failed to deseriliaze the encapsulated secret"
         ),
         (
             RUNTIME_MAILBOX_SIGNATURE_MISMATCH,
@@ -2614,7 +2704,7 @@ impl CaliptraError {
             UDS_FE_PROGRAMMING_ZEROIZATION_FAILED,
             0xa006_0005,
             "UDS FE Zeroization Failed"
-        )
+        ),
     ];
 }
 

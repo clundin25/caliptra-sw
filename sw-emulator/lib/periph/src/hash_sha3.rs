@@ -65,12 +65,16 @@ impl From<u32> for Endianness {
     }
 }
 
-fn digest_to_state(input: [u8; 200]) -> [u32; 50] {
+fn digest_to_state(input: [u8; 200], big_endian: bool) -> [u32; 50] {
     let mut output = [0u32; 50];
     for (i, chunk) in input.chunks(4).enumerate() {
         let mut array = [0u8; 4];
         array.copy_from_slice(chunk);
-        output[i] = u32::from_be_bytes(array);
+        output[i] = if big_endian {
+            u32::from_be_bytes(array)
+        } else {
+            u32::from_le_bytes(array)
+        };
     }
 
     output
@@ -207,20 +211,19 @@ impl caliptra_emu_bus::Bus for MsgFifo {
                 self.data.push(val as u8);
             }
             RvSize::HalfWord => {
-                // TODO: it's not clear what endianness means for halfword writes
                 let val = val as u16;
                 let val = if self.swap_endianness {
-                    val.to_le_bytes()
-                } else {
                     val.to_be_bytes()
+                } else {
+                    val.to_le_bytes()
                 };
                 self.data.extend_from_slice(&val);
             }
             RvSize::Word => {
                 let val = if self.swap_endianness {
-                    val.to_le_bytes()
-                } else {
                     val.to_be_bytes()
+                } else {
+                    val.to_le_bytes()
                 };
                 self.data.extend_from_slice(&val);
             }
@@ -335,7 +338,7 @@ impl HashSha3 {
         self.sha3.set_hasher(mode.into(), strength.into());
 
         self.msg_fifo.swap_endianness =
-            self.cfg_shadowed.reg.read(CfgShadowed::STATE_ENDIANNESS) == Endianness::Big.into();
+            self.cfg_shadowed.reg.read(CfgShadowed::MSG_ENDIANNESS) == Endianness::Big.into();
 
         Ok(())
     }
@@ -361,12 +364,17 @@ impl HashSha3 {
         let cmd: CmdType = self.cmd.reg.read(Cmd::CMD).into();
         match cmd {
             CmdType::Start => {
-                // change to abosrb state
-                self.status.reg.modify(Status::SHA3_ABSORB::SET);
+                // Transition to Absorb state: clear Idle, set Absorb
+                self.msg_fifo.data.clear();
+                self.status
+                    .reg
+                    .modify(Status::SHA3_IDLE::CLEAR + Status::SHA3_ABSORB::SET);
             }
             CmdType::Process => {
-                // change to squeeze state
-                self.status.reg.modify(Status::SHA3_SQUEEZE::SET);
+                // Transition from Absorb to Squeeze state
+                self.status
+                    .reg
+                    .modify(Status::SHA3_ABSORB::CLEAR + Status::SHA3_SQUEEZE::SET);
 
                 let res = self.sha3.update(&self.msg_fifo.data);
                 if !res {
@@ -378,10 +386,16 @@ impl HashSha3 {
                 if !res {
                     Err(BusError::StoreAccessFault)?
                 }
-                self.state = digest_to_state(self.sha3.digest());
+                let big_endian = self.cfg_shadowed.reg.read(CfgShadowed::STATE_ENDIANNESS)
+                    == Endianness::Big.into();
+                self.state = digest_to_state(self.sha3.digest(), big_endian);
             }
             CmdType::Run => todo!(),
             CmdType::Done => {
+                // Transition to Idle state: clear Squeeze, set Idle
+                self.status.reg.modify(
+                    Status::SHA3_SQUEEZE::CLEAR + Status::SHA3_IDLE::SET + Status::FIFO_EMPTY::SET,
+                );
                 self.state.fill(0);
             }
         }

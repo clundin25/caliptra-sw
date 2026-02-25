@@ -48,7 +48,6 @@ impl<Algo: SigningAlgorithm> CsrTemplateBuilder<Algo> {
     ///
     /// * `ca`       - Flag indicating if the certificate is a Certificate Authority
     /// * `path_len` - Certificate path length
-
     pub fn add_basic_constraints_ext(mut self, ca: bool, path_len: u32) -> Self {
         self.exts
             .push(x509::make_basic_constraints_ext(ca, path_len))
@@ -120,6 +119,29 @@ impl<Algo: SigningAlgorithm> CsrTemplateBuilder<Algo> {
             .chain(vendor_device_fwids.iter())
             .chain(fmc_fwids.iter())
         {
+            self.params.push(CsrTemplateParam {
+                tbs_param: TbsParam::new(fwid.name, 0, fwid.fwid.digest.len()),
+                needle: fwid.fwid.digest.to_vec(),
+            });
+        }
+
+        self
+    }
+
+    /// Add Runtime DICE TCB Info Extension
+    pub fn add_rt_dice_tcb_info_ext(mut self, fwids: &[FwidParam]) -> Self {
+        let svn: u8 = 0xC1;
+
+        self.exts
+            .push(x509::make_rt_dice_tcb_info_ext(svn, fwids))
+            .unwrap();
+
+        self.params.push(CsrTemplateParam {
+            tbs_param: TbsParam::new("tcb_info_fw_svn", 0, std::mem::size_of_val(&svn)),
+            needle: svn.to_be_bytes().to_vec(),
+        });
+
+        for fwid in fwids.iter() {
             self.params.push(CsrTemplateParam {
                 tbs_param: TbsParam::new(fwid.name, 0, fwid.fwid.digest.len()),
                 needle: fwid.fwid.digest.to_vec(),

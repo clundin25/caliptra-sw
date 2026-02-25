@@ -810,13 +810,13 @@ Command Code: `0x4453_424C` ("DSBL")
 | chksum        | u32      | Checksum over other output arguments, computed by Caliptra. Little endian.
 | fips\_status  | u32      | Indicates if the command is FIPS approved or an error.
 
-### INVOKE\_DPE\_COMMAND
+### INVOKE\_DPE\_ECC384
 
-Invokes a serialized DPE command.
+Invokes a serialized EC-P384 DPE profile command.
 
 Command Code: `0x4450_4543` ("DPEC")
 
-*Table: `INVOKE_DPE_COMMAND` input arguments*
+*Table: `INVOKE_DPE_ECC384` input arguments*
 
 | **Name**     | **Type**      | **Description**
 | --------     | --------      | ---------------
@@ -824,7 +824,30 @@ Command Code: `0x4450_4543` ("DPEC")
 | data\_size   | u32           | Length in bytes of the valid data in the data field.
 | data         | u8[...]       | DPE command structure as defined in the DPE iRoT profile.
 
-*Table: `INVOKE_DPE_COMMAND` output arguments*
+*Table: `INVOKE_DPE_ECC384` output arguments*
+
+| **Name**      | **Type**      | **Description**
+| --------      | --------      | ---------------
+| chksum        | u32           | Checksum over other output arguments, computed by Caliptra. Little endian.
+| fips\_status  | u32           | Indicates if the command is FIPS approved or an error.
+| data\_size    | u32           | Length in bytes of the valid data in the data field.
+| data          | u8[...]       | DPE response structure as defined in the DPE iRoT profile.
+
+### INVOKE\_DPE\_MLDSA87
+
+Invokes a serialized ML-DSA-87 DPE profile command.
+
+Command Code: `0x4450_4543` ("DPEC")
+
+*Table: `INVOKE_DPE_MLDSA87` input arguments*
+
+| **Name**     | **Type**      | **Description**
+| --------     | --------      | ---------------
+| chksum       | u32           | Checksum over other input arguments, computed by the caller. Little endian.
+| data\_size   | u32           | Length in bytes of the valid data in the data field.
+| data         | u8[...]       | DPE command structure as defined in the DPE iRoT profile.
+
+*Table: `INVOKE_DPE_MLDSA87` output arguments*
 
 | **Name**      | **Type**      | **Description**
 | --------      | --------      | ---------------
@@ -1426,6 +1449,93 @@ Command Code: `0x434D_5346` ("CMSF")
 | fips_status | u32           | FIPS approved or an error |
 | hash size   | u32           |                           |
 | hash        | u8[hash size] |                           |
+
+### CM\_SHAKE256\_INIT
+
+This starts the computation of a SHAKE256 extendable-output hash, which may be larger than a single mailbox command allows.
+
+**Note:** Unlike the CM\_SHA commands, SHAKE256 cannot save and restore hardware state between calls. Instead, the SHA3 hardware state is kept live, and the context returned to the caller is an encrypted random session token. If any other SHA3 operation occurs between INIT and FINAL, the session is invalidated and UPDATE/FINAL will return an error.
+
+The sequence to use these are:
+* 1 `CM_SHAKE256_INIT` command
+* 0 or more `CM_SHAKE256_UPDATE` commands
+* 1 `CM_SHAKE256_FINAL` command
+
+For each command, the context from the previous command's output must be passed as an input.
+
+The `SHAKE256_CONTEXT_SIZE` is always exactly 44 bytes long (encrypted session token).
+
+The maximum supported input data size per command is 4096 bytes.
+
+Command Code: `0x434D_5849` ("CMXI")
+
+*Table: `CM_SHAKE256_INIT` input arguments*
+
+| **Name**  | **Type**      | **Description** |
+| --------- | ------------- | --------------- |
+| chksum    | u32           |                 |
+| data size | u32           |                 |
+| data      | u8[data size] | Data to hash    |
+
+*Table: `CM_SHAKE256_INIT` output arguments*
+
+| **Name**    | **Type**                  | **Description**                                    |
+| ----------- | ------------------------- | -------------------------------------------------- |
+| chksum      | u32                       |                                                    |
+| fips_status | u32                       | FIPS approved or an error                          |
+| context     | u8[SHAKE256_CONTEXT_SIZE] | Passed to `CM_SHAKE256_UPDATE` / `CM_SHAKE256_FINAL` |
+
+### CM\_SHAKE256\_UPDATE
+
+This continues a SHAKE256 computation started by `CM_SHAKE256_INIT` or from another `CM_SHAKE256_UPDATE`.
+
+The context MUST be passed in from `CM_SHAKE256_INIT` or `CM_SHAKE256_UPDATE`.
+
+Command Code: `0x434D_5855` ("CMXU")
+
+*Table: `CM_SHAKE256_UPDATE` input arguments*
+
+| **Name**  | **Type**                  | **Description**                                      |
+| --------- | ------------------------- | ---------------------------------------------------- |
+| chksum    | u32                       |                                                      |
+| context   | u8[SHAKE256_CONTEXT_SIZE] | From `CM_SHAKE256_INIT` / `CM_SHAKE256_UPDATE`       |
+| data size | u32                       |                                                      |
+| data      | u8[data size]             | Data to hash                                         |
+
+*Table: `CM_SHAKE256_UPDATE` output arguments*
+
+| **Name**    | **Type**                  | **Description**                                    |
+| ----------- | ------------------------- | -------------------------------------------------- |
+| chksum      | u32                       |                                                    |
+| fips_status | u32                       | FIPS approved or an error                          |
+| context     | u8[SHAKE256_CONTEXT_SIZE] | Passed to `CM_SHAKE256_UPDATE` / `CM_SHAKE256_FINAL` |
+
+### CM\_SHAKE256\_FINAL
+
+This finalizes the SHAKE256 computation and produces the hash of all of the data.
+
+The context MUST be passed in from `CM_SHAKE256_INIT` or `CM_SHAKE256_UPDATE`.
+
+The output is always a 64-byte SHAKE256 digest.
+
+Command Code: `0x434D_5846` ("CMXF")
+
+*Table: `CM_SHAKE256_FINAL` input arguments*
+
+| **Name**    | **Type**                  | **Description**                                |
+| ----------- | ------------------------- | ---------------------------------------------- |
+| chksum      | u32                       |                                                |
+| context     | u8[SHAKE256_CONTEXT_SIZE] | From `CM_SHAKE256_INIT` / `CM_SHAKE256_UPDATE` |
+| data size   | u32                       | May be 0                                       |
+| data        | u8[data size]             | Data to hash                                   |
+
+*Table: `CM_SHAKE256_FINAL` output arguments*
+
+| **Name**    | **Type** | **Description**           |
+| ----------- | -------- | ------------------------- |
+| chksum      | u32      |                           |
+| fips_status | u32      | FIPS approved or an error |
+| hash        | u8[64]   | SHAKE256 digest           |
 
 ### CM\_HMAC
 

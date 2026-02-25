@@ -97,11 +97,48 @@ impl Sha3Cmd {
 
 pub struct Sha3 {
     sha3: KmacReg,
+    /// Random token identifying the active streaming session.
+    /// Set on shake256_streaming_start, cleared when any other operation
+    /// uses the hardware. Used to detect if hardware state was disturbed.
+    active_session_token: Option<u128>,
 }
 
 impl Sha3 {
     pub fn new(sha3: KmacReg) -> Self {
-        Self { sha3 }
+        Self {
+            sha3,
+            active_session_token: None,
+        }
+    }
+
+    /// Start a SHAKE256 streaming operation (for use across mailbox calls).
+    /// Stores the provided random token to identify this session.
+    pub fn shake256_streaming_start(&mut self, token: u128) -> CaliptraResult<()> {
+        self.digest_start(Sha3Mode::Shake, Sha3KStrength::L256)?;
+        self.active_session_token = Some(token);
+        Ok(())
+    }
+
+    /// Stream data to an in-progress SHAKE256 operation.
+    /// Verifies that the session token matches the active session.
+    pub fn shake256_streaming_update(&mut self, token: u128, data: &[u8]) -> CaliptraResult<()> {
+        if self.active_session_token != Some(token) {
+            return Err(CaliptraError::DRIVER_SHA3_INVALID_STATE_ERR);
+        }
+        self.stream_msg(data)
+    }
+
+    /// Finalize a SHAKE256 streaming operation and read the digest (up to 64 bytes).
+    /// Verifies that the session token matches, then clears the session.
+    pub fn shake256_streaming_finalize(&mut self, token: u128) -> CaliptraResult<Array4xN<16, 64>> {
+        if self.active_session_token != Some(token) {
+            return Err(CaliptraError::DRIVER_SHA3_INVALID_STATE_ERR);
+        }
+        self.active_session_token = None;
+        self.finalize()?;
+        let digest = self.read_digest::<16, 64>(Sha3Mode::Shake, Sha3KStrength::L256)?;
+        self.zeroize_internal();
+        Ok(digest)
     }
 
     // Additional modes may be added by simply creating analogous functions for the two below
@@ -140,23 +177,53 @@ impl Sha3 {
         &mut self,
         data: &[u8],
     ) -> CaliptraResult<Array4xN<W, B>> {
-        self.digest_generic(Sha3Mode::Shake, Sha3KStrength::L256, data)
+        self.digest_generic(Sha3Mode::Shake, Sha3KStrength::L256, [data].iter())
+    }
+
+    /// Calculate the SHA3-256 digest for specified data
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - Data to used to update the digest
+    ///
+    /// # Returns
+    ///
+    /// * `Array4x8` - Array containing the digest.
+    #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
+    pub fn sha3_256_digest(&mut self, data: &[u8]) -> CaliptraResult<crate::Array4x8> {
+        self.digest_generic(Sha3Mode::Sha3, Sha3KStrength::L256, [data].iter())
+    }
+
+    // Similar to `sha3_256_digest` but allows passing an iterator of slices to avoid copying data.
+    #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
+    pub fn sha3_256_digest_ext<I, T>(&mut self, data: I) -> CaliptraResult<crate::Array4x8>
+    where
+        I: Iterator<Item = T>,
+        T: AsRef<[u8]>,
+    {
+        self.digest_generic(Sha3Mode::Sha3, Sha3KStrength::L256, data)
     }
 
     // Helper function to be called by a mode-specific public function
     // Performs a digest using a single, provided slice of data
-    fn digest_generic<const W: usize, const B: usize>(
+    fn digest_generic<const W: usize, const B: usize, I, T>(
         &mut self,
         mode: Sha3Mode,
         strength: Sha3KStrength,
-        data: &[u8],
-    ) -> CaliptraResult<Array4xN<W, B>> {
+        data: I,
+    ) -> CaliptraResult<Array4xN<W, B>>
+    where
+        I: Iterator<Item = T>,
+        T: AsRef<[u8]>,
+    {
         // START
         self.digest_start(mode, strength)?;
 
         // UPDATE
         // Stream data
-        self.stream_msg(data)?;
+        for item in data {
+            self.stream_msg(item.as_ref())?;
+        }
 
         // FINALIZE
         self.finalize()?;
@@ -172,9 +239,22 @@ impl Sha3 {
 
     // Initialize the digest operation and wait for the absorb state to be set
     fn digest_start(&mut self, mode: Sha3Mode, strength: Sha3KStrength) -> CaliptraResult<()> {
+        // Any new operation invalidates an active streaming session
+        self.active_session_token = None;
+
         let reg = self.sha3.regs_mut();
 
         // INIT
+        // If hardware is not idle (e.g., abandoned streaming op), reset it
+        if !reg.status().read().sha3_idle() {
+            // If we are in absorb, we first have to squeeze before we can transition to done.
+            if reg.status().read().sha3_absorb() {
+                reg.cmd().write(|w| w.cmd(Sha3Cmd::Process.reg_value()));
+                wait::until(|| reg.status().read().sha3_squeeze());
+            }
+            reg.cmd().write(|w| w.cmd(Sha3Cmd::Done.reg_value()));
+        }
+
         // Ensure HW is in the right state
         wait::until(|| reg.status().read().sha3_idle());
 
@@ -265,6 +345,7 @@ impl Sha3 {
 
     /// Zeroize the hardware registers.
     fn zeroize_internal(&mut self) {
+        self.active_session_token = None;
         self.sha3
             .regs_mut()
             .cmd()

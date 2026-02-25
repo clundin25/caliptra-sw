@@ -48,13 +48,15 @@ if [[ -z "${SKIP_DEBOOTSTRAP}" ]]; then
   chroot out/rootfs bash -c 'echo "[Time]" > /etc/systemd/timesyncd.conf'
   chroot out/rootfs bash -c 'echo "NTP=time.google.com" >> /etc/systemd/timesyncd.conf'
 
-if [[ "$BUILD_DEV_IMAGE" == "true" ]]; then
+  if [[ "$BUILD_DEV_IMAGE" == "true" ]]; then
       echo "Adding developer keys to image"
-      chroot out/rootfs bash -c "echo \"PubkeyAuthentication yes\" >> /etc/ssh/sshd_config" 
-      chroot out/rootfs bash -c "echo \"PasswordAuthentication no\" >> /etc/ssh/sshd_config" 
+      chroot out/rootfs bash -c "echo \"PubkeyAuthentication yes\" >> /etc/ssh/sshd_config"
+      chroot out/rootfs bash -c "echo \"PasswordAuthentication no\" >> /etc/ssh/sshd_config"
       chroot out/rootfs bash -c "su runner -c \"mkdir /home/runner/.ssh\""
 
       # Authorized project developer keys. Keep alphabetized.
+      # amit-kumarh
+      chroot out/rootfs bash -c "su runner -c \"echo ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEao/69xPyAhZNHUIhiqvDT/q+XQ4mEvLoOwiVDN2W0T >> ~/.ssh/authorized_keys\""
       # cfrantz
       chroot out/rootfs bash -c "su runner -c \"echo ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFGaE+OpSSfjOO/J6ap0dpNWHwqG0IsuMK4Ca0LY2n3L cfrantz@cfrantz-desktop.svl.corp.google.com >> ~/.ssh/authorized_keys\""
       # clundin
@@ -63,17 +65,14 @@ if [[ "$BUILD_DEV_IMAGE" == "true" ]]; then
       chroot out/rootfs bash -c "su runner -c \"echo ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBNAmcxogmvhKGQy/kd5R+uB382XiSb1p/hlqx/lJv3IcxT3JDVk2cRuVxipirplizT6g5+a5FWH6fGrOizQ/Rd0= publickey >> ~/.ssh/authorized_keys\""
       # jlmahowa-amd
       chroot out/rootfs bash -c "su runner -c \"echo ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIER1Qp/fV0TrAdlUpQZwApMvLLdnQecLraHiIlKAQazi luke.mahowald@amd.com >> ~/.ssh/authorized_keys\""
-      # moidx
-      chroot out/rootfs bash -c "su runner -c \"echo ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAING7nHmIo6v/jHTFuLGlALBM9bJ+p8WI4H6NZCREkxxc miguelosorio@google.com >> ~/.ssh/authorized_keys\""
-      # ttrippel
-      chroot out/rootfs bash -c "su runner -c \"echo ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1MjEAAACFBAC3/lGx3rPr9Nns3aAS8faxKHOj/jgqLNFpjfXehz2kGhNC2EGRibXBHHP738KEG+rjA8HOsG8oHFmTFcOBJf+UqgDNmIfx7M5Db3cEgvhMcZSWck3Nb6ouIBwVchFgAupohpKmGroNuLB5QDuOE3cA8U7zN3y1L8uhUrDAxNPmS2Dvag== ttrippel@ttrippel.svl.corp.google.com >> ~/.ssh/authorized_keys\""
-
-      # sileno-rocco-soc
-      chroot out/rootfs bash -c "su runner -c \"echo ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFdco7xfZ3kPkSYrVWZsGWYB8VuRPTT8FupUXegAj2+n sileno@sileno-caliptra.c.googlers.com >> ~/.ssh/authorized_keys\""
-      
       # jose-cipriano-soc
       chroot out/rootfs bash -c "su runner -c \"echo ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOqxIT54u8MjPlfrEbBNI01f1irf27GfeZF9uCjPdkaI josecipriano@josecipriano.c.googlers.com >> ~/.ssh/authorized_keys\""
-
+      # moidx
+      chroot out/rootfs bash -c "su runner -c \"echo ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAING7nHmIo6v/jHTFuLGlALBM9bJ+p8WI4H6NZCREkxxc miguelosorio@google.com >> ~/.ssh/authorized_keys\""
+      # sileno-rocco-soc
+      chroot out/rootfs bash -c "su runner -c \"echo ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFdco7xfZ3kPkSYrVWZsGWYB8VuRPTT8FupUXegAj2+n sileno@sileno-caliptra.c.googlers.com >> ~/.ssh/authorized_keys\""
+      # ttrippel
+      chroot out/rootfs bash -c "su runner -c \"echo ecdsa-sha2-nistp521 AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1MjEAAACFBAC3/lGx3rPr9Nns3aAS8faxKHOj/jgqLNFpjfXehz2kGhNC2EGRibXBHHP738KEG+rjA8HOsG8oHFmTFcOBJf+UqgDNmIfx7M5Db3cEgvhMcZSWck3Nb6ouIBwVchFgAupohpKmGroNuLB5QDuOE3cA8U7zN3y1L8uhUrDAxNPmS2Dvag== ttrippel@ttrippel.svl.corp.google.com >> ~/.ssh/authorized_keys\""
       # zhalvorsen
       chroot out/rootfs bash -c "su runner -c \"echo ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNoYTItbmlzdHAzODQAAAAIbmlzdHAzODQAAABhBLCee6PZ63j9MXxo2LIB6K7I5WmIKJAWdww922p9klsKVhLkMpNPXkLtYaf44GDLSmNO1j2stkXw174agt722rAa6fNInSCY8HPpAlyAJ7xELEGDOb5FfQVJU5ruGYJ7LQ== zhalvorsen@zhalvorsen.c.googlers.com >> ~/.ssh/authorized_keys\""
 
@@ -117,7 +116,7 @@ EOF
 fi
 
 pushd out
-podman run --rm -v$PWD:/work-dir -w/work-dir ghcr.io/chipsalliance/caliptra-build-image:latest /bin/bash -c "rustup +1.90 target add aarch64-unknown-linux-gnu && CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc cargo +1.90 install cargo-nextest --version 0.9.118 --target aarch64-unknown-linux-gnu --target-dir /work-dir"
+podman run --rm -v$PWD:/work-dir -w/work-dir ghcr.io/chipsalliance/caliptra-builder:latest /bin/bash -c "rustup +1.90 target add aarch64-unknown-linux-gnu && CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc cargo +1.90 install cargo-nextest --version 0.9.118 --target aarch64-unknown-linux-gnu --target-dir /work-dir"
 popd
 
 mv out/aarch64-unknown-linux-gnu/release/cargo-nextest out/rootfs/usr/bin/
@@ -130,6 +129,25 @@ cp startup-script.service out/rootfs/etc/systemd/system/
 chroot out/rootfs systemctl enable startup-script.service
 
 cp out/io-module.ko out/rootfs/home/runner/io-module.ko
+
+
+CURRDATE=`date`
+chroot out/rootfs bash -c "echo \"Build date: ${CURRDATE}\" > /etc/caliptra-build-info"
+if [[ "$BUILD_DEV_IMAGE" == "true" ]]; then
+  chroot out/rootfs bash -c "echo \"Image env : dev\" >> /etc/caliptra-build-info"
+else
+  chroot out/rootfs bash -c "echo \"Image env : non-dev\" >> /etc/caliptra-build-info"
+fi
+chroot out/rootfs bash -c "echo \"Image variant : ${IMAGE_VARIANT}\" >> /etc/caliptra-build-info"
+chroot out/rootfs bash -c "echo \"Runner version : ${RUNNER_VERSION}\" >> /etc/caliptra-build-info"
+chroot out/rootfs bash -c "echo \"Workflow name : ${GITHUB_WORKFLOW}\" >> /etc/caliptra-build-info"
+chroot out/rootfs bash -c "echo \"Workflow branch : ${GITHUB_HEAD_REF}\" >> /etc/caliptra-build-info"
+chroot out/rootfs bash -c "echo \"Workflow build commit : ${GITHUB_WORKFLOW_SHA}\" >> /etc/caliptra-build-info"
+HASH=`md5sum out/io-module.ko | awk '{print $1}'`
+chroot out/rootfs bash -c "echo \"Hash io-module.ko : ${HASH}\" >> /etc/caliptra-build-info"
+HASH=`md5sum out/system-boot.tar.gz | awk '{print $1}'`
+chroot out/rootfs bash -c "echo \"Hash system-boot.tar.gz : ${HASH}\" >> /etc/caliptra-build-info"
+
 
 rm -f out/image.img
 bootfs_blocks="$((80000 * 4))"

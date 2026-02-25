@@ -12,12 +12,14 @@ Push version changes to the caliptra-sw repository.
 
 - Update version numbers in:
   - builder/src/version.rs
+  - builder/test_data/default_image_options.toml
 - Update expected values in:
   - test/tests/fips_test_suite/common.rs
 - Update versions in the appropriate README files:
   - rom/dev/README.md
   - fmc/README.md
   - runtime/README.md
+* Regenerate frozen sums (See `./ci.sh update_frozen_images`).
 
 ### Commit Changes
 

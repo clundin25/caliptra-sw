@@ -2,6 +2,23 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[cfg(all(
+    target_arch = "riscv32",
+    not(clippy),
+    feature = "rom",
+    feature = "runtime"
+))]
+compile_error!("features \"rom\" and \"runtime\" are mutually exclusive");
+#[cfg(all(target_arch = "riscv32", not(clippy), feature = "rom", feature = "fmc"))]
+compile_error!("features \"rom\" and \"fmc\" are mutually exclusive");
+#[cfg(all(
+    target_arch = "riscv32",
+    not(clippy),
+    feature = "fmc",
+    feature = "runtime"
+))]
+compile_error!("features \"fmc\" and \"runtime\" are mutually exclusive");
+
 pub mod boot_status;
 pub mod capabilities {
     pub use caliptra_api::Capabilities;
@@ -47,9 +64,9 @@ pub use pcr::{PcrLogEntry, PcrLogEntryId, RT_FW_CURRENT_PCR, RT_FW_JOURNEY_PCR};
 pub use pmp::lock_datavault_region;
 
 pub const FMC_ORG: u32 = 0x40000000;
-pub const FMC_SIZE: u32 = 36 * 1024; // Must be 4k aligned
+pub const FMC_SIZE: u32 = 32 * 1024; // Must be 4k aligned
 pub const RUNTIME_ORG: u32 = FMC_ORG + FMC_SIZE;
-pub const RUNTIME_SIZE: u32 = 180 * 1024;
+pub const RUNTIME_SIZE: u32 = 210 * 1024;
 
 pub use memory_layout::{EXTRA_MEMORY_ORG, PERSISTENT_DATA_ORG};
 pub use wdt::{restart_wdt, start_wdt, stop_wdt, WdtTimeout};
