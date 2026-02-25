@@ -41,80 +41,87 @@ impl FromStr for ReleaseTag {
     }
 }
 
-fn verify_rom(tag: &ReleaseTag, version_rs: &str, common_rs: &str, readme: &str) -> Result<()> {
+struct ReleaseRelevantFiles {
+    version_rs: String,
+    common_rs: String,
+    toml: String,
+    readme: String,
+}
+
+fn verify_rom(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
     let major = tag.major;
     let minor = tag.minor;
     let patch = tag.patch;
 
-    if !version_rs.contains(&format!("pub const ROM_VERSION_MAJOR: u16 = {};", major)) ||
-       !version_rs.contains(&format!("pub const ROM_VERSION_MINOR: u16 = {};", minor)) ||
-       !version_rs.contains(&format!("pub const ROM_VERSION_PATCH: u16 = {};", patch)) {
+    if !files.version_rs.contains(&format!("pub const ROM_VERSION_MAJOR: u16 = {};", major)) ||
+       !files.version_rs.contains(&format!("pub const ROM_VERSION_MINOR: u16 = {};", minor)) ||
+       !files.version_rs.contains(&format!("pub const ROM_VERSION_PATCH: u16 = {};", patch)) {
         bail!("builder/src/version.rs does not have correct ROM version");
     }
 
     let rom_hex = ((major & 0x1F) << 11) | ((minor & 0x1F) << 6) | (patch & 0x3F);
     let expected_hex = format!("0x{:04x}", rom_hex);
-    if !common_rs.contains(&expected_hex) {
+    if !files.common_rs.contains(&expected_hex) {
         bail!("test/tests/fips_test_suite/common.rs does not contain expected ROM hex version {}", expected_hex);
     }
 
-    if !readme.contains(&format!("v{}.{}", major, minor)) {
+    if !files.readme.contains(&format!("v{}.{}", major, minor)) {
         bail!("rom/dev/README.md does not contain expected version v{}.{}", major, minor);
     }
     Ok(())
 }
 
-fn verify_fmc(tag: &ReleaseTag, version_rs: &str, common_rs: &str, toml: &str, readme: &str) -> Result<()> {
+fn verify_fmc(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
     let major = tag.major;
     let minor = tag.minor;
     let patch = tag.patch;
 
-    if !version_rs.contains(&format!("pub const FMC_VERSION_MAJOR: u16 = {};", major)) ||
-       !version_rs.contains(&format!("pub const FMC_VERSION_MINOR: u16 = {};", minor)) ||
-       !version_rs.contains(&format!("pub const FMC_VERSION_PATCH: u16 = {};", patch)) {
+    if !files.version_rs.contains(&format!("pub const FMC_VERSION_MAJOR: u16 = {};", major)) ||
+       !files.version_rs.contains(&format!("pub const FMC_VERSION_MINOR: u16 = {};", minor)) ||
+       !files.version_rs.contains(&format!("pub const FMC_VERSION_PATCH: u16 = {};", patch)) {
         bail!("builder/src/version.rs does not have correct FMC version");
     }
 
     let fmc_hex = ((major & 0x1F) << 11) | ((minor & 0x1F) << 6) | (patch & 0x3F);
     let expected_hex = format!("0x{:04x}", fmc_hex);
 
-    if !toml.contains(&format!("fmc_version = {}", expected_hex)) {
+    if !files.toml.contains(&format!("fmc_version = {}", expected_hex)) {
         bail!("builder/test_data/default_image_options.toml does not contain expected FMC hex version {}", expected_hex);
     }
 
-    if !common_rs.contains(&expected_hex) {
+    if !files.common_rs.contains(&expected_hex) {
         bail!("test/tests/fips_test_suite/common.rs does not contain expected FMC hex version {}", expected_hex);
     }
 
-    if !readme.contains(&format!("v{}.{}", major, minor)) {
+    if !files.readme.contains(&format!("v{}.{}", major, minor)) {
         bail!("fmc/README.md does not contain expected version v{}.{}", major, minor);
     }
     Ok(())
 }
 
-fn verify_fw(tag: &ReleaseTag, version_rs: &str, common_rs: &str, toml: &str, readme: &str) -> Result<()> {
+fn verify_fw(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
     let major = tag.major;
     let minor = tag.minor;
     let patch = tag.patch;
 
-    if !version_rs.contains(&format!("pub const RUNTIME_VERSION_MAJOR: u32 = {};", major)) ||
-       !version_rs.contains(&format!("pub const RUNTIME_VERSION_MINOR: u32 = {};", minor)) ||
-       !version_rs.contains(&format!("pub const RUNTIME_VERSION_PATCH: u32 = {};", patch)) {
+    if !files.version_rs.contains(&format!("pub const RUNTIME_VERSION_MAJOR: u32 = {};", major)) ||
+       !files.version_rs.contains(&format!("pub const RUNTIME_VERSION_MINOR: u32 = {};", minor)) ||
+       !files.version_rs.contains(&format!("pub const RUNTIME_VERSION_PATCH: u32 = {};", patch)) {
         bail!("builder/src/version.rs does not have correct RUNTIME version");
     }
 
     let fw_hex = ((major & 0xFF) << 24) | ((minor & 0xFF) << 16) | (patch & 0xFFFF);
     
-    if !toml.contains(&format!("app_version = 0x{:x}", fw_hex)) {
+    if !files.toml.contains(&format!("app_version = 0x{:x}", fw_hex)) {
         bail!("builder/test_data/default_image_options.toml does not contain expected FW hex version 0x{:x}", fw_hex);
     }
 
-    let common_rs_clean = common_rs.replace("_", "");
+    let common_rs_clean = files.common_rs.replace("_", "");
     if !common_rs_clean.contains(&format!("0x{:08x}", fw_hex)) {
         bail!("test/tests/fips_test_suite/common.rs does not contain expected FW hex version 0x{:08x}", fw_hex);
     }
 
-    if !readme.contains(&format!("v{}.{}", major, minor)) {
+    if !files.readme.contains(&format!("v{}.{}", major, minor)) {
         bail!("runtime/README.md does not contain expected version v{}.{}", major, minor);
     }
     Ok(())
@@ -132,15 +139,18 @@ pub(crate) fn check(tag_str: &str) -> Result<()> {
     match tag.component.as_str() {
         "rom" => {
             let readme = fs::read_to_string("rom/dev/README.md")?;
-            verify_rom(&tag, &version_rs, &common_rs, &readme)?;
+            let files = ReleaseRelevantFiles { version_rs, common_rs, toml, readme };
+            verify_rom(&tag, &files)?;
         }
         "fmc" => {
             let readme = fs::read_to_string("fmc/README.md")?;
-            verify_fmc(&tag, &version_rs, &common_rs, &toml, &readme)?;
+            let files = ReleaseRelevantFiles { version_rs, common_rs, toml, readme };
+            verify_fmc(&tag, &files)?;
         }
         "fw" => {
             let readme = fs::read_to_string("runtime/README.md")?;
-            verify_fw(&tag, &version_rs, &common_rs, &toml, &readme)?;
+            let files = ReleaseRelevantFiles { version_rs, common_rs, toml, readme };
+            verify_fw(&tag, &files)?;
         }
         _ => bail!("Unknown component '{}'. Expected 'rom', 'fmc', or 'fw'", tag.component),
     }
