@@ -26,7 +26,10 @@ enum Commands {
     /// Run pre-check-in checks
     Precheckin,
     /// Execute the release process checklist
-    Release,
+    Release {
+        /// The release tag to verify, formatted as component-major.minor.patch (e.g. fmc-2.0.0)
+        tag: String,
+    },
 }
 
 pub static PROJECT_ROOT: LazyLock<PathBuf> = LazyLock::new(|| {
@@ -51,7 +54,7 @@ fn main() {
     let result = match &cli.xtask {
         Commands::Clippy => clippy::clippy(),
         Commands::Precheckin => precheckin::precheckin(),
-        Commands::Release => release::release(),
+        Commands::Release { tag } => release::release(tag),
     };
     result.unwrap_or_else(|e| {
         log::error!("Error: {}", e);
