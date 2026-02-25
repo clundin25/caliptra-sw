@@ -195,7 +195,26 @@ pub(crate) fn check(tag_str: &str) -> Result<()> {
 
 pub(crate) fn deploy(tag_str: &str) -> Result<()> {
     check(tag_str)?;
-    println!("Automated deployment is currently unimplemented.");
+    
+    println!("Creating git tag: {}", tag_str);
+    let tag_status = std::process::Command::new("git")
+        .args(["tag", tag_str])
+        .status()?;
+
+    if !tag_status.success() {
+        bail!("Failed to create git tag '{}'", tag_str);
+    }
+
+    println!("Pushing git tag to origin: {}", tag_str);
+    let push_status = std::process::Command::new("git")
+        .args(["push", "origin", tag_str])
+        .status()?;
+
+    if !push_status.success() {
+        bail!("Failed to push git tag '{}' to origin", tag_str);
+    }
+
+    println!("Successfully deployed tag {}", tag_str);
     Ok(())
 }
 
