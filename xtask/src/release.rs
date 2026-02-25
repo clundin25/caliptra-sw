@@ -119,7 +119,7 @@ fn verify_fw(tag: &ReleaseTag, version_rs: &str, common_rs: &str, toml: &str, re
     Ok(())
 }
 
-pub(crate) fn release(tag_str: &str) -> Result<()> {
+pub(crate) fn check(tag_str: &str) -> Result<()> {
     let tag: ReleaseTag = tag_str.parse()?;
 
     println!("Verifying version for {} to be {}.{}.{}\n", tag.component, tag.major, tag.minor, tag.patch);
@@ -190,6 +190,12 @@ pub(crate) fn release(tag_str: &str) -> Result<()> {
     pause();
 
     println!("Release process complete!");
+    Ok(())
+}
+
+pub(crate) fn deploy(tag_str: &str) -> Result<()> {
+    check(tag_str)?;
+    println!("Automated deployment is currently unimplemented.");
     Ok(())
 }
 

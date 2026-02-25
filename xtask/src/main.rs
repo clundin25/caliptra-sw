@@ -27,7 +27,21 @@ enum Commands {
     Precheckin,
     /// Execute the release process checklist
     Release {
+        #[command(subcommand)]
+        command: ReleaseCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum ReleaseCommands {
+    /// Check the versions for a given release tag
+    Check {
         /// The release tag to verify, formatted as component-major.minor.patch (e.g. fmc-2.0.0)
+        tag: String,
+    },
+    /// Deploy a given release tag
+    Deploy {
+        /// The release tag to deploy, formatted as component-major.minor.patch (e.g. fmc-2.0.0)
         tag: String,
     },
 }
@@ -54,7 +68,10 @@ fn main() {
     let result = match &cli.xtask {
         Commands::Clippy => clippy::clippy(),
         Commands::Precheckin => precheckin::precheckin(),
-        Commands::Release { tag } => release::release(tag),
+        Commands::Release { command } => match command {
+            ReleaseCommands::Check { tag } => release::check(tag),
+            ReleaseCommands::Deploy { tag } => release::deploy(tag),
+        },
     };
     result.unwrap_or_else(|e| {
         log::error!("Error: {}", e);
