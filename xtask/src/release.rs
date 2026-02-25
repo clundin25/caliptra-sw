@@ -1,8 +1,9 @@
 // Licensed under the Apache-2.0 license
 
 use anyhow::{bail, Result};
+use log::info;
 use std::fs;
-use std::io::{self, Write};
+use std::io;
 use std::str::FromStr;
 
 #[derive(Debug)]
@@ -122,7 +123,7 @@ fn verify_fw(tag: &ReleaseTag, version_rs: &str, common_rs: &str, toml: &str, re
 pub(crate) fn check(tag_str: &str) -> Result<()> {
     let tag: ReleaseTag = tag_str.parse()?;
 
-    println!("Verifying version for {} to be {}.{}.{}\n", tag.component, tag.major, tag.minor, tag.patch);
+    info!("Verifying version for {} to be {}.{}.{}\n", tag.component, tag.major, tag.minor, tag.patch);
 
     let version_rs = fs::read_to_string("builder/src/version.rs")?;
     let common_rs = fs::read_to_string("test/tests/fips_test_suite/common.rs")?;
@@ -144,59 +145,59 @@ pub(crate) fn check(tag_str: &str) -> Result<()> {
         _ => bail!("Unknown component '{}'. Expected 'rom', 'fmc', or 'fw'", tag.component),
     }
 
-    println!("All version checks passed for {} {}.{}.{}!\n", tag.component, tag.major, tag.minor, tag.patch);
+    info!("All version checks passed for {} {}.{}.{}!\n", tag.component, tag.major, tag.minor, tag.patch);
 
-    println!("Caliptra Firmware Release Process");
-    println!("=================================\n");
+    info!("Caliptra Firmware Release Process");
+    info!("=================================\n");
 
-    println!("Step 1: Update Versions in caliptra-sw");
-    println!("--------------------------------------");
-    println!("- Update version numbers in:");
-    println!("  - builder/src/version.rs");
-    println!("  - builder/test_data/default_image_options.toml");
-    println!("- Update expected values in:");
-    println!("  - test/tests/fips_test_suite/common.rs");
-    println!("- Update versions in the appropriate README files:");
-    println!("  - rom/dev/README.md");
-    println!("  - fmc/README.md");
-    println!("  - runtime/README.md");
-    println!("- Regenerate frozen sums (See `./ci.sh update_frozen_images`)");
-    println!("- Push changes in a single commit titled: Updating <ROM, FMC, RT FW> version to x.y.z");
+    info!("Step 1: Update Versions in caliptra-sw");
+    info!("--------------------------------------");
+    info!("- Update version numbers in:");
+    info!("  - builder/src/version.rs");
+    info!("  - builder/test_data/default_image_options.toml");
+    info!("- Update expected values in:");
+    info!("  - test/tests/fips_test_suite/common.rs");
+    info!("- Update versions in the appropriate README files:");
+    info!("  - rom/dev/README.md");
+    info!("  - fmc/README.md");
+    info!("  - runtime/README.md");
+    info!("- Regenerate frozen sums (See `./ci.sh update_frozen_images`)");
+    info!("- Push changes in a single commit titled: Updating <ROM, FMC, RT FW> version to x.y.z");
     pause();
 
-    println!("Step 2: Perform Release on GitHub");
-    println!("---------------------------------");
-    println!("- Run the nightly release GitHub Action and wait for it to complete.");
-    println!("- Update the existing GitHub release:");
-    println!("  - Update the release title (e.g. ROM-1.2.3)");
-    println!("  - Uncheck \"Set as a pre-release\"");
-    println!("  - Check \"Set as the latest release\"");
-    println!("  - Select \"Update release\"");
+    info!("Step 2: Perform Release on GitHub");
+    info!("---------------------------------");
+    info!("- Run the nightly release GitHub Action and wait for it to complete.");
+    info!("- Update the existing GitHub release:");
+    info!("  - Update the release title (e.g. ROM-1.2.3)");
+    info!("  - Uncheck \"Set as a pre-release\"");
+    info!("  - Check \"Set as the latest release\"");
+    info!("  - Select \"Update release\"");
     pause();
 
-    println!("Step 3: Tag the Release");
-    println!("-----------------------");
-    println!("- Create a new git tag corresponding to the released component:");
-    println!("  - ROM: rom-x.y.z");
-    println!("  - FMC: fmc-x.y.z");
-    println!("  - Runtime Firmware: rt-x.y.z");
-    println!("- Push the new git tag(s) to origin.");
+    info!("Step 3: Tag the Release");
+    info!("-----------------------");
+    info!("- Create a new git tag corresponding to the released component:");
+    info!("  - ROM: rom-x.y.z");
+    info!("  - FMC: fmc-x.y.z");
+    info!("  - Runtime Firmware: rt-x.y.z");
+    info!("- Push the new git tag(s) to origin.");
     pause();
 
-    println!("Step 4: Notify Users");
-    println!("--------------------");
-    println!("- Update version information on the Caliptra site.");
-    println!("- Post an announcement on the Caliptra blog.");
+    info!("Step 4: Notify Users");
+    info!("--------------------");
+    info!("- Update version information on the Caliptra site.");
+    info!("- Post an announcement on the Caliptra blog.");
     pause();
 
-    println!("Release process complete!");
+    info!("Release process complete!");
     Ok(())
 }
 
 pub(crate) fn deploy(tag_str: &str) -> Result<()> {
     check(tag_str)?;
     
-    println!("Creating git tag: {}", tag_str);
+    info!("Creating git tag: {}", tag_str);
     let tag_status = std::process::Command::new("git")
         .args(["tag", tag_str])
         .status()?;
@@ -205,7 +206,7 @@ pub(crate) fn deploy(tag_str: &str) -> Result<()> {
         bail!("Failed to create git tag '{}'", tag_str);
     }
 
-    println!("Pushing git tag to origin: {}", tag_str);
+    info!("Pushing git tag to origin: {}", tag_str);
     let push_status = std::process::Command::new("git")
         .args(["push", "origin", tag_str])
         .status()?;
@@ -214,14 +215,12 @@ pub(crate) fn deploy(tag_str: &str) -> Result<()> {
         bail!("Failed to push git tag '{}' to origin", tag_str);
     }
 
-    println!("Successfully deployed tag {}", tag_str);
+    info!("Successfully deployed tag {}", tag_str);
     Ok(())
 }
 
 fn pause() {
-    print!("Press Enter to continue...");
-    io::stdout().flush().unwrap();
+    info!("Press Enter to continue...");
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
-    println!();
 }
