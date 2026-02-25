@@ -24,9 +24,13 @@ mod idevid_csr_ecc_384;
 mod idevid_csr_mldsa_87;
 mod ldevid_cert_ecc_384;
 mod ldevid_cert_mldsa_87;
+mod ldevid_csr_ecc_384;
+mod ldevid_csr_mldsa_87;
 mod ocp_lock_hpke_certs;
 mod rt_alias_cert_ecc_384;
 mod rt_alias_cert_mldsa_87;
+mod rt_alias_csr_ecc_384;
+mod rt_alias_csr_mldsa_87;
 mod test_util;
 
 pub use cert_bldr::{
@@ -42,12 +46,18 @@ pub use idevid_csr_ecc_384::{InitDevIdCsrTbsEcc384, InitDevIdCsrTbsEcc384Params}
 pub use idevid_csr_mldsa_87::{InitDevIdCsrTbsMlDsa87, InitDevIdCsrTbsMlDsa87Params};
 pub use ldevid_cert_ecc_384::{LocalDevIdCertTbsEcc384, LocalDevIdCertTbsEcc384Params};
 pub use ldevid_cert_mldsa_87::{LocalDevIdCertTbsMlDsa87, LocalDevIdCertTbsMlDsa87Params};
+pub use ldevid_csr_ecc_384::{LocalDevIdCsrTbsEcc384, LocalDevIdCsrTbsEcc384Params};
+pub use ldevid_csr_mldsa_87::{LocalDevIdCsrTbsMlDsa87, LocalDevIdCsrTbsMlDsa87Params};
 pub use rt_alias_cert_ecc_384::{RtAliasCertTbsEcc384, RtAliasCertTbsEcc384Params};
 pub use rt_alias_cert_mldsa_87::{RtAliasCertTbsMlDsa87, RtAliasCertTbsMlDsa87Params};
+pub use rt_alias_csr_ecc_384::{RtAliasCsrTbsEcc384, RtAliasCsrTbsEcc384Params};
+pub use rt_alias_csr_mldsa_87::{RtAliasCsrTbsMlDsa87, RtAliasCsrTbsMlDsa87Params};
 
 pub use ocp_lock_hpke_certs::{
     ecdh_384_ecc_348::{OcpLockEcdh384CertTbsEcc384, OcpLockEcdh384CertTbsEcc384Params},
     ecdh_384_mldsa_87::{OcpLockEcdh384CertTbsMlDsa87, OcpLockEcdh384CertTbsMlDsa87Params},
+    hybrid_ecc_384::{OcpLockHybridCertTbsEcc384, OcpLockHybridCertTbsEcc384Params},
+    hybrid_mldsa_87::{OcpLockHybridCertTbsMlDsa87, OcpLockHybridCertTbsMlDsa87Params},
     ml_kem_ecc_348::{OcpLockMlKemCertTbsEcc384, OcpLockMlKemCertTbsEcc384Params},
     ml_kem_mldsa_87::{OcpLockMlKemCertTbsMlDsa87, OcpLockMlKemCertTbsMlDsa87Params},
 };

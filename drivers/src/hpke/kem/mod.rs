@@ -3,44 +3,61 @@
 use caliptra_error::CaliptraResult;
 use zeroize::ZeroizeOnDrop;
 
+mod hybrid;
 mod mlkem;
+mod p384;
 
+pub use hybrid::*;
 pub use mlkem::*;
+pub use p384::*;
 
 use zerocopy::{FromBytes, Immutable, KnownLayout};
 
-use crate::Trng;
+use super::suites::KemId;
+use crate::Array4x12;
 
-use super::suites::KemIdExt;
+use super::kdf::Hmac384;
 
 // TODO(clundin): Leaving the trait in for now but I am not sure we really need it.
+// TODO(clundin): Clean up copies & serialization + deserialize by making EK & DK internal or
+// associated types.
 
 /// Implements KEM functionality for HPKE
 pub trait Kem<const NSK: usize, const NENC: usize, const NPK: usize, const NSECRET: usize> {
     /// The extended Kem id, fed into the labeled derive function to expand `ikm`.
-    const KEM_ID_EXT: KemIdExt;
+    const KEM_ID: KemId;
 
+    /// Holds a KEM specific GAT for objects whose lifetime must be shorter than the KEM
+    /// implementer.
+    type CONTEXT<'a>;
+
+    /// The encapsulation key.
     type EK;
 
     /// Derives a KEM keypair from the `ikm` seed.
-    fn derive_key_pair(
-        &mut self,
-        ikm: &[u8; NSK],
-    ) -> CaliptraResult<(Self::EK, DecapsulationKey<NSK>)>;
+    fn derive_key_pair(ctx: &mut Self::CONTEXT<'_>, ikm: &[u8; NSK]) -> CaliptraResult<Self>
+    where
+        Self: Sized;
 
     /// Generates a shared secret key and associated ciphertext
     fn encap(
         &mut self,
-        trng: &mut Trng,
+        ctx: &mut Self::CONTEXT<'_>,
         encaps_key: &Self::EK,
     ) -> CaliptraResult<(EncapsulatedSecret<NENC>, SharedSecret<NSECRET>)>;
 
     /// Uses the decapsulation key to produce a shared secret key from a ciphertext.
     fn decap(
         &mut self,
+        ctx: &mut Self::CONTEXT<'_>,
         enc: &EncapsulatedSecret<NENC>,
-        dk: &DecapsulationKey<NSK>,
     ) -> CaliptraResult<SharedSecret<NSECRET>>;
+
+    /// Serializes the public key
+    fn serialize_public_key(
+        &mut self,
+        ctx: &mut Self::CONTEXT<'_>,
+    ) -> CaliptraResult<EncapsulationKey<NPK>>;
 }
 
 /// Shared Secret produced by `encap`.
@@ -55,10 +72,28 @@ impl<const NSECRET: usize> AsRef<[u8]> for SharedSecret<NSECRET> {
     }
 }
 
+impl From<Array4x12> for SharedSecret<{ Hmac384::NH }> {
+    fn from(value: Array4x12) -> Self {
+        Self { buf: value.into() }
+    }
+}
+
+impl From<crate::Array4x8> for SharedSecret<32> {
+    fn from(value: crate::Array4x8) -> Self {
+        Self { buf: value.into() }
+    }
+}
+
 /// Ciphertext produced by `encap`.
 #[derive(Debug, PartialEq, KnownLayout, Immutable, FromBytes)]
 pub struct EncapsulatedSecret<const NENC: usize> {
     buf: [u8; NENC],
+}
+
+impl<const NENC: usize> AsRef<[u8; NENC]> for EncapsulatedSecret<NENC> {
+    fn as_ref(&self) -> &[u8; NENC] {
+        &self.buf
+    }
 }
 
 /// Serialized ML-KEM Encap key
@@ -85,7 +120,7 @@ impl<const NPK: usize> AsRef<[u8; NPK]> for EncapsulationKey<NPK> {
     }
 }
 
-/// Serialized ML-KEM Decap key
+/// Serialized Decap key
 #[derive(Debug, ZeroizeOnDrop)]
 pub struct DecapsulationKey<const NSK: usize> {
     buf: [u8; NSK],

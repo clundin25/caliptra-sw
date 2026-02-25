@@ -14,6 +14,23 @@ Abstract:
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[cfg(all(
+    target_arch = "riscv32",
+    not(clippy),
+    feature = "rom",
+    feature = "runtime"
+))]
+compile_error!("features \"rom\" and \"runtime\" are mutually exclusive");
+#[cfg(all(target_arch = "riscv32", not(clippy), feature = "rom", feature = "fmc"))]
+compile_error!("features \"rom\" and \"fmc\" are mutually exclusive");
+#[cfg(all(
+    target_arch = "riscv32",
+    not(clippy),
+    feature = "fmc",
+    feature = "runtime"
+))]
+compile_error!("features \"fmc\" and \"runtime\" are mutually exclusive");
+
 mod array;
 mod array_concat;
 mod wait;
@@ -68,8 +85,9 @@ pub use aes::{
     AES_CONTEXT_SIZE_BYTES, AES_GCM_CONTEXT_SIZE_BYTES,
 };
 pub use array::{
-    Array4x12, Array4x16, Array4x4, Array4x5, Array4x8, Array4xN, LEArray4x1157, LEArray4x16,
-    LEArray4x3, LEArray4x392, LEArray4x4, LEArray4x648, LEArray4x792, LEArray4x8,
+    Array4x12, Array4x16, Array4x28, Array4x4, Array4x5, Array4x8, Array4xN, LEArray4x1157,
+    LEArray4x12, LEArray4x16, LEArray4x3, LEArray4x392, LEArray4x4, LEArray4x648, LEArray4x792,
+    LEArray4x8,
 };
 pub use array_concat::array_concat3;
 pub use bounded_address::{BoundedAddr, MemBounds, RomAddr};
@@ -82,8 +100,8 @@ pub use csrng::{
 };
 pub use data_vault::{ColdResetEntries, DataVault, WarmResetEntries};
 pub use dma::{
-    AesDmaMode, AxiAddr, Dma, DmaMmio, DmaOtpCtrl, DmaReadTarget, DmaReadTransaction, DmaRecovery,
-    DmaWriteOrigin, DmaWriteTransaction,
+    AesDmaMode, AxiAddr, Dma, DmaEncryptionEngine, DmaMmio, DmaOtpCtrl, DmaReadTarget,
+    DmaReadTransaction, DmaRecovery, DmaWriteOrigin, DmaWriteTransaction,
 };
 pub use doe::DeobfuscationEngine;
 pub use ecc384::{
@@ -117,8 +135,8 @@ pub use ml_kem::{
     MlKem1024SharedKeyOut, MlKemResult,
 };
 pub use mldsa87::{
-    Mldsa87, Mldsa87Msg, Mldsa87PrivKey, Mldsa87PubKey, Mldsa87Result, Mldsa87Seed, Mldsa87SignRnd,
-    Mldsa87Signature,
+    Mldsa87, Mldsa87Msg, Mldsa87Mu, Mldsa87PrivKey, Mldsa87PubKey, Mldsa87Result, Mldsa87Seed,
+    Mldsa87SignRnd, Mldsa87Signature,
 };
 pub use ocp_lock::HekSeedState;
 pub use pcr_bank::{PcrBank, PcrId};

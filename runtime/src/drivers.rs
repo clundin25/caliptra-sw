@@ -16,12 +16,13 @@ Abstract:
 
 use crate::cryptographic_mailbox::CmStorage;
 use crate::debug_unlock::ProductionDebugUnlock;
+use crate::dpe_crypto::DpeEcCrypto;
 #[cfg(feature = "fips_self_test")]
 pub use crate::fips::fips_self_test_cmd::SelfTestStatus;
 use crate::ocp_lock::OcpLockContext;
 use crate::recovery_flow::RecoveryFlow;
 use crate::{
-    dice, CptraDpeTypes, DisableAttestationCmd, DpeCrypto, DpePlatform, Mailbox, CALIPTRA_LOCALITY,
+    dice, CptraDpeEcTypes, DisableAttestationCmd, DpePlatform, Mailbox, CALIPTRA_LOCALITY,
     DPE_SUPPORT, MAX_ECC_CERT_CHAIN_SIZE, MAX_MLDSA_CERT_CHAIN_SIZE,
     PL0_DPE_ACTIVE_CONTEXT_DEFAULT_THRESHOLD, PL0_PAUSER_FLAG,
     PL1_DPE_ACTIVE_CONTEXT_DEFAULT_THRESHOLD,
@@ -43,7 +44,7 @@ use caliptra_drivers::{
     PcrBank, PersistentDataAccessor, Pic, ResetReason, Sha256, Sha256Alg, Sha2_512_384,
     Sha2_512_384Acc, Sha3, SocIfc, Trng,
 };
-use caliptra_drivers::{Dma, DmaMmio, MlKem1024, Mldsa87PubKey};
+use caliptra_drivers::{okref, Dma, DmaMmio, MlKem1024, Mldsa87PubKey};
 use caliptra_image_types::ImageManifest;
 use caliptra_registers::aes::AesReg;
 use caliptra_registers::aes_clp::AesClpReg;
@@ -54,9 +55,12 @@ use caliptra_registers::{
     soc_ifc_trng::SocIfcTrngReg,
 };
 use caliptra_x509::{NotAfter, NotBefore};
-use crypto::Digest;
+use crypto::ecdsa::curve_384::EcdsaPub384;
+use crypto::ecdsa::EcdsaPubKey;
+use crypto::{Digest, PubKey};
 use dpe::commands::DeriveContextCmd;
 use dpe::context::{Context, ContextState, ContextType};
+use dpe::response::DeriveContextResp;
 use dpe::tci::TciMeasurement;
 use dpe::validation::DpeValidator;
 use dpe::MAX_HANDLES;
@@ -181,7 +185,7 @@ impl Drivers {
             PersistentDataAccessor::new(),
         )?;
 
-        let aes = Aes::new(AesReg::new(), AesClpReg::new());
+        let aes = Aes::new(AesReg::new(), AesClpReg::new())?;
         let soc_ifc = SocIfc::new(SocIfcReg::new());
         let persistent_data = PersistentDataAccessor::new();
 
@@ -202,7 +206,7 @@ impl Drivers {
             // TODO(clundin): Don't pass multiple `AbrReg`'s to higher level drivers.
             // https://github.com/chipsalliance/caliptra-sw/issues/3107
             mldsa87: Mldsa87::new(AbrReg::new()),
-            ml_kem: MlKem1024::new(AbrReg::new()),
+            ml_kem: MlKem1024::new(AbrReg::new())?,
             lms: Lms::default(),
             trng,
             persistent_data,
@@ -473,7 +477,7 @@ impl Drivers {
 
     /// Compute the Caliptra Name SerialNumber by Sha256 hashing the RT Alias public key
     #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
-    pub fn compute_rt_alias_sn(&mut self) -> CaliptraResult<Digest> {
+    pub fn compute_ecc_rt_alias_sn(&mut self) -> CaliptraResult<Digest> {
         let key = self
             .persistent_data
             .get()
@@ -483,6 +487,18 @@ impl Drivers {
             .to_der();
 
         let rt_digest = self.sha256.digest(&key)?;
+        let token = Digest::Sha256(crypto::Sha256(rt_digest.into()));
+
+        Ok(token)
+    }
+
+    /// Compute the Caliptra Name SerialNumber by Sha256 hashing the RT Alias public key
+    #[cfg_attr(not(feature = "no-cfi"), cfi_impl_fn)]
+    pub fn compute_mldsa_rt_alias_sn(&mut self) -> CaliptraResult<Digest> {
+        let key = Self::get_key_id_rt_mldsa_pub_key(self);
+        let key = okref(&key)?;
+
+        let rt_digest = self.sha256.digest(key.as_bytes())?;
         let token = Digest::Sha256(crypto::Sha256(rt_digest.into()));
 
         Ok(token)
@@ -498,7 +514,7 @@ impl Drivers {
             .manifest1
             .header
             .pl0_pauser;
-        let hashed_rt_pub_key = drivers.compute_rt_alias_sn()?;
+        let hashed_rt_pub_key = drivers.compute_ecc_rt_alias_sn()?;
         let privilege_level = drivers.caller_privilege_level();
 
         // Set context limits in persistent data as we init DPE
@@ -525,13 +541,18 @@ impl Drivers {
         let key_id_rt_cdi = Drivers::get_key_id_rt_cdi(drivers)?;
         let key_id_rt_priv_key = Drivers::get_key_id_rt_ecc_priv_key(drivers)?;
         let pdata = drivers.persistent_data.get_mut();
-        let crypto = DpeCrypto::new(
+        let rt_pub_key = &mut pdata.rom.fht.rt_dice_ecc_pub_key;
+        let rt_pub_key = PubKey::Ecdsa(EcdsaPubKey::Ecdsa384(EcdsaPub384::from_slice(
+            &rt_pub_key.x.into(),
+            &rt_pub_key.y.into(),
+        )));
+        let crypto = DpeEcCrypto::new(
             &mut drivers.sha2_512_384,
             &mut drivers.trng,
             &mut drivers.ecc384,
             &mut drivers.hmac,
             &mut drivers.key_vault,
-            &mut pdata.rom.fht.rt_dice_ecc_pub_key,
+            rt_pub_key,
             key_id_rt_cdi,
             key_id_rt_priv_key,
             &mut pdata.fw.dpe.exported_cdi_slots,
@@ -539,7 +560,7 @@ impl Drivers {
 
         let (nb, nf) = Self::get_cert_validity_info(&pdata.rom.manifest1);
         let mut state = dpe::State::new(DPE_SUPPORT, DpeFlags::empty());
-        let mut env = DpeEnv::<CptraDpeTypes> {
+        let mut env = DpeEnv::<CptraDpeEcTypes> {
             crypto,
             platform: DpePlatform::new(
                 CALIPTRA_LOCALITY,
@@ -574,7 +595,8 @@ impl Drivers {
             .as_bytes()
             .try_into()
             .map_err(|_| CaliptraError::RUNTIME_ADD_VALID_PAUSER_MEASUREMENT_TO_DPE_FAILED)?;
-        let derive_context_resp = DeriveContextCmd {
+        let derive_context_resp = &mut [0u8; size_of::<DeriveContextResp>()];
+        let result = DeriveContextCmd {
             handle: ContextHandle::default(),
             data: TciMeasurement(valid_pauser_hash),
             flags: DeriveContextFlags::MAKE_DEFAULT
@@ -585,8 +607,8 @@ impl Drivers {
             target_locality: pl0_pauser_locality,
             svn: 0,
         }
-        .execute(&mut dpe, &mut env, CALIPTRA_LOCALITY);
-        if let Err(e) = derive_context_resp {
+        .execute_serialized(&mut dpe, &mut env, CALIPTRA_LOCALITY, derive_context_resp);
+        if let Err(e) = result {
             // If there is extended error info, populate CPTRA_FW_EXTENDED_ERROR_INFO
             if let Some(ext_err) = e.get_error_detail() {
                 drivers.soc_ifc.set_fw_extended_error(ext_err);
@@ -612,7 +634,7 @@ impl Drivers {
 
             let measurement_data = measurement_log_entry.pcr_entry.measured_data();
             let tci_type = u32::from_ne_bytes(measurement_log_entry.metadata);
-            let derive_context_resp = DeriveContextCmd {
+            let result = DeriveContextCmd {
                 handle: ContextHandle::default(),
                 data: TciMeasurement(
                     measurement_data
@@ -627,8 +649,13 @@ impl Drivers {
                 target_locality: pl0_pauser_locality,
                 svn: 0,
             }
-            .execute(&mut dpe, &mut env, pl0_pauser_locality);
-            if let Err(e) = derive_context_resp {
+            .execute_serialized(
+                &mut dpe,
+                &mut env,
+                pl0_pauser_locality,
+                derive_context_resp,
+            );
+            if let Err(e) = result {
                 // If there is extended error info, populate CPTRA_FW_EXTENDED_ERROR_INFO
                 if let Some(ext_err) = e.get_error_detail() {
                     drivers.soc_ifc.set_fw_extended_error(ext_err);

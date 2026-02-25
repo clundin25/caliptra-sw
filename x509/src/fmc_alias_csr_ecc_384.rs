@@ -13,9 +13,6 @@ Abstract:
 --*/
 
 // Note: All the necessary code is auto generated
-#[cfg(feature = "generate_templates")]
-include!(concat!(env!("OUT_DIR"), "/fmc_alias_csr_tbs_ecc_384.rs"));
-#[cfg(not(feature = "generate_templates"))]
 include! {"../build/fmc_alias_csr_tbs_ecc_384.rs"}
 
 #[cfg(all(test, target_family = "unix"))]
@@ -180,6 +177,20 @@ mod tests {
 
         assert!(ku_ext.critical);
 
+        // ExtendedKeyUsage
+        let eku_ext = requested_extensions
+            .iter()
+            .find(|ext| matches!(ext.parsed_extension(), ParsedExtension::ExtendedKeyUsage(_)))
+            .unwrap();
+        let ParsedExtension::ExtendedKeyUsage(eku) = eku_ext.parsed_extension() else {
+            panic!("Extension is not ExtendedKeyUsage");
+        };
+
+        assert!(!eku_ext.critical);
+        // Should contain TCG_DICE_KP_ECA (2.23.133.5.4.100.12) and TCG_DICE_KP_ATTEST_LOC (2.23.133.5.4.100.9)
+        assert!(eku.other.contains(&oid!(2.23.133 .5 .4 .100 .12)));
+        assert!(eku.other.contains(&oid!(2.23.133 .5 .4 .100 .9)));
+
         // UEID
         let ueid_ext = requested_extensions
             .iter()
@@ -205,20 +216,5 @@ mod tests {
             })
             .unwrap();
         assert!(!multi_tcb_info.critical);
-    }
-
-    #[test]
-    #[cfg(feature = "generate_templates")]
-    fn test_fmc_alias_csr_template() {
-        let manual_template =
-            std::fs::read(std::path::Path::new("./build/fmc_alias_csr_tbs.rs")).unwrap();
-        let auto_generated_template = std::fs::read(std::path::Path::new(concat!(
-            env!("OUT_DIR"),
-            "/fmc_alias_csr_tbs.rs"
-        )))
-        .unwrap();
-        if auto_generated_template != manual_template {
-            panic!("Auto-generated FMC Alias CSR template is not equal to the manual template.")
-        }
     }
 }

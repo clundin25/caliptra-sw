@@ -28,13 +28,18 @@ use caliptra_hw_model::{
     ModelCallback, ModelError, SecurityState, StackInfo, StackRange, SubsystemInitParams,
 };
 
+use caliptra_runtime::CaliptraDpeProfile;
 pub use caliptra_test::{
     default_soc_manifest_bytes, image_pk_desc_hash, test_upload_firmware, DEFAULT_MCU_FW,
 };
+use crypto::{Digest, Mu, PrecomputedSignData, Sha384};
 use dpe::{
-    commands::{Command, CommandHdr},
+    commands::{
+        CertifyKeyCommand, CertifyKeyFlags, CertifyKeyMldsa87Cmd, CertifyKeyP384Cmd, Command,
+        CommandHdr, SignFlags, SignMldsa87Cmd, SignP384Cmd,
+    },
+    context::ContextHandle,
     response::{DpeErrorCode, Response, ResponseHdr},
-    DpeProfile,
 };
 use openssl::{
     asn1::{Asn1Integer, Asn1Time, Asn1TimeRef},
@@ -57,6 +62,14 @@ pub const TEST_DIGEST: [u8; 48] = [
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
     27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48,
 ];
+pub const TEST_MU: [u8; 64] = [
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+    27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+    51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64,
+];
+pub const TEST_SD_SHA384: PrecomputedSignData =
+    PrecomputedSignData::Digest(Digest::Sha384(Sha384(TEST_DIGEST)));
+pub const TEST_SD_MU: PrecomputedSignData = PrecomputedSignData::Mu(Mu(TEST_MU));
 
 pub const DEFAULT_FMC_VERSION: u16 = 0xaaaa;
 pub const DEFAULT_APP_VERSION: u32 = 0xbbbbbbbb;
@@ -223,17 +236,20 @@ pub fn start_rt_test_pqc_model(
     });
 
     let image_info = vec![
-        ImageInfo::new(
+        ImageInfo::with_name(
             StackRange::new(ROM_STACK_ORG + ROM_STACK_SIZE, ROM_STACK_ORG),
             CodeRange::new(ROM_ORG, ROM_ORG + ROM_SIZE),
+            "caliptra-rom".to_owned(),
         ),
-        ImageInfo::new(
+        ImageInfo::with_name(
             StackRange::new(STACK_ORG + STACK_SIZE, STACK_ORG),
             CodeRange::new(FMC_ORG, FMC_ORG + FMC_SIZE),
+            "caliptra-fmc".to_owned(),
         ),
-        ImageInfo::new(
+        ImageInfo::with_name(
             StackRange::new(STACK_ORG + STACK_SIZE, STACK_ORG),
             CodeRange::new(RUNTIME_ORG, RUNTIME_ORG + RUNTIME_SIZE),
+            "caliptra-runtime".to_owned(),
         ),
     ];
 
@@ -357,26 +373,37 @@ pub enum DpeResult {
 
 pub fn execute_dpe_cmd(
     model: &mut DefaultHwModel,
+    profile: CaliptraDpeProfile,
     dpe_cmd: &mut Command,
     expected_result: DpeResult,
 ) -> Option<Response> {
     let mut cmd_data: [u8; 512] = [0u8; InvokeDpeReq::DATA_MAX_SIZE];
-    let cmd_hdr = CommandHdr::new(DpeProfile::P384Sha384, dpe_cmd.id());
+    let cmd_hdr = CommandHdr::new(profile.into(), dpe_cmd.id());
     let cmd_hdr_buf = cmd_hdr.as_bytes();
     cmd_data[..cmd_hdr_buf.len()].copy_from_slice(cmd_hdr_buf);
     let dpe_cmd_buf = dpe_cmd.as_bytes();
     cmd_data[cmd_hdr_buf.len()..cmd_hdr_buf.len() + dpe_cmd_buf.len()].copy_from_slice(dpe_cmd_buf);
-    let mut mbox_cmd = MailboxReq::InvokeDpeCommand(InvokeDpeReq {
-        hdr: MailboxReqHeader { chksum: 0 },
-        data: cmd_data,
-        data_size: (cmd_hdr_buf.len() + dpe_cmd_buf.len()) as u32,
-    });
+    let (cmd_id, mut mbox_cmd) = match profile {
+        CaliptraDpeProfile::Ecc384 => (
+            CommandId::INVOKE_DPE_ECC384,
+            MailboxReq::InvokeDpeEcc384Command(InvokeDpeReq {
+                hdr: MailboxReqHeader { chksum: 0 },
+                data: cmd_data,
+                data_size: (cmd_hdr_buf.len() + dpe_cmd_buf.len()) as u32,
+            }),
+        ),
+        CaliptraDpeProfile::Mldsa87 => (
+            CommandId::INVOKE_DPE_MLDSA87,
+            MailboxReq::InvokeDpeMldsa87Command(InvokeDpeReq {
+                hdr: MailboxReqHeader { chksum: 0 },
+                data: cmd_data,
+                data_size: (cmd_hdr_buf.len() + dpe_cmd_buf.len()) as u32,
+            }),
+        ),
+    };
     mbox_cmd.populate_chksum().unwrap();
 
-    let resp = model.mailbox_execute(
-        u32::from(CommandId::INVOKE_DPE),
-        mbox_cmd.as_bytes().unwrap(),
-    );
+    let resp = model.mailbox_execute(u32::from(cmd_id), mbox_cmd.as_bytes().unwrap());
     if let DpeResult::MboxCmdFailure(expected_err) = expected_result {
         assert_error(model, expected_err, resp.unwrap_err());
         return None;
@@ -403,6 +430,121 @@ pub fn execute_dpe_cmd(
         DpeResult::DpeCmdFailure => Response::Error(ResponseHdr::try_read_from_bytes(resp_bytes).unwrap()),
         DpeResult::MboxCmdFailure(_) => unreachable!("If MboxCmdFailure is the expected DPE result, the function would have returned None earlier."),
     })
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum CertifyKeyCommandNoRef {
+    P384(CertifyKeyP384Cmd),
+    Mldsa(CertifyKeyMldsa87Cmd),
+}
+
+impl CertifyKeyCommandNoRef {
+    pub fn new(args: CreateCertifyKeyCmdArgs) -> Self {
+        match args.profile {
+            CaliptraDpeProfile::Ecc384 => CertifyKeyCommandNoRef::P384(CertifyKeyP384Cmd {
+                handle: args.handle,
+                label: args.label,
+                flags: args.flags,
+                format: args.format,
+            }),
+            CaliptraDpeProfile::Mldsa87 => CertifyKeyCommandNoRef::Mldsa(CertifyKeyMldsa87Cmd {
+                handle: args.handle,
+                label: args.label,
+                flags: args.flags,
+                format: args.format,
+            }),
+        }
+    }
+}
+
+impl<'a> From<&'a CertifyKeyCommandNoRef> for Command<'a> {
+    fn from(cmd: &'a CertifyKeyCommandNoRef) -> Command<'a> {
+        match cmd {
+            CertifyKeyCommandNoRef::P384(cmd) => cmd.into(),
+            CertifyKeyCommandNoRef::Mldsa(cmd) => cmd.into(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum SignCommandNoRef {
+    P384(SignP384Cmd),
+    Mldsa(SignMldsa87Cmd),
+}
+
+impl SignCommandNoRef {
+    pub fn new(args: CreateSignCmdArgs) -> Self {
+        let CreateSignCmdArgs { profile, data, .. } = args;
+        match (profile, data) {
+            (CaliptraDpeProfile::Ecc384, PrecomputedSignData::Digest(Digest::Sha384(digest))) => {
+                Self::P384(SignP384Cmd {
+                    handle: args.handle,
+                    label: args.label,
+                    flags: args.flags,
+                    digest: digest.0,
+                })
+            }
+            (CaliptraDpeProfile::Mldsa87, PrecomputedSignData::Mu(mu)) => {
+                Self::Mldsa(SignMldsa87Cmd {
+                    handle: args.handle,
+                    label: args.label,
+                    flags: args.flags,
+                    digest: mu.0,
+                })
+            }
+            _ => panic!("Invalid combination of profile and precomputed sign data"),
+        }
+    }
+}
+
+impl<'a> From<&'a SignCommandNoRef> for Command<'a> {
+    fn from(cmd: &'a SignCommandNoRef) -> Command<'a> {
+        match cmd {
+            SignCommandNoRef::P384(cmd) => cmd.into(),
+            SignCommandNoRef::Mldsa(cmd) => cmd.into(),
+        }
+    }
+}
+
+pub struct CreateSignCmdArgs {
+    pub profile: CaliptraDpeProfile,
+    pub handle: ContextHandle,
+    pub label: [u8; 48],
+    pub flags: SignFlags,
+    pub data: PrecomputedSignData,
+}
+
+impl Default for CreateSignCmdArgs {
+    fn default() -> Self {
+        Self {
+            profile: CaliptraDpeProfile::Ecc384,
+            handle: ContextHandle::default(),
+            label: TEST_LABEL,
+            flags: SignFlags::empty(),
+            data: PrecomputedSignData::Digest([0u8; 48].into()),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct CreateCertifyKeyCmdArgs {
+    pub profile: CaliptraDpeProfile,
+    pub handle: ContextHandle,
+    pub label: [u8; 48],
+    pub flags: CertifyKeyFlags,
+    pub format: u32,
+}
+
+impl Default for CreateCertifyKeyCmdArgs {
+    fn default() -> Self {
+        Self {
+            profile: CaliptraDpeProfile::Ecc384,
+            handle: ContextHandle::default(),
+            label: TEST_LABEL,
+            flags: CertifyKeyFlags::empty(),
+            format: CertifyKeyCommand::FORMAT_X509,
+        }
+    }
 }
 
 pub fn assert_error(

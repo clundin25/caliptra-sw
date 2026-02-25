@@ -9,14 +9,14 @@ use caliptra_common::keyids::ocp_lock::{
 use caliptra_drivers::{
     cmac_kdf, hmac_kdf,
     hpke::{
-        aead::Aes256GCM, suites::CipherSuite, EncryptionContext, HpkeContext, HpkeContextIter,
+        aead::Aes256GCM, suites::HpkeCipherSuite, EncryptionContext, HpkeContext, HpkeContextIter,
         HpkeHandle, Receiver,
     },
     preconditioned_aes::{preconditioned_aes_decrypt, preconditioned_aes_encrypt},
     sha2_512_384::Sha2DigestOpTrait,
-    Aes, AesKey, AesOperation, Array4x12, Dma, Hmac, HmacKey, HmacMode, HmacTag, KeyReadArgs,
-    KeyUsage, KeyVault, KeyWriteArgs, LEArray4x16, LEArray4x8, MlKem1024, OcpLockFlags,
-    OcpLockMetadataFirmware, Sha2_512_384, Sha3, SocIfc, Trng,
+    Aes, AesKey, AesOperation, Array4x12, Dma, Ecc384, Hmac, HmacKey, HmacMode, HmacTag,
+    KeyReadArgs, KeyUsage, KeyVault, KeyWriteArgs, LEArray4x16, LEArray4x8, MlKem1024,
+    OcpLockFlags, OcpLockMetadataFirmware, Sha2_512_384, Sha3, SocIfc, Trng,
 };
 use caliptra_error::{CaliptraError, CaliptraResult};
 
@@ -31,6 +31,7 @@ use test_access_key::TestAccessKeyCmd;
 use zerocopy::{transmute, FromBytes, Immutable, IntoBytes, KnownLayout};
 use zeroize::ZeroizeOnDrop;
 
+mod clear_key_cache;
 mod derive_mek;
 mod enable_mpk;
 mod endorse_hpke_pubkey;
@@ -38,16 +39,21 @@ mod enumerate_hpke_handles;
 mod generate_mek;
 mod generate_mpk;
 mod get_algorithms;
+mod get_status;
 mod initialize_mek_secret;
 mod mix_mpk;
 mod rewrap_mpk;
 mod rotate_hpke_key;
 mod test_access_key;
+mod unload_mek;
 
+pub use clear_key_cache::ClearKeyCacheCmd;
 pub use derive_mek::DeriveMekCmd;
 pub use get_algorithms::GetAlgorithmsCmd;
+pub use get_status::GetStatusCmd;
 pub use initialize_mek_secret::InitializeMekSecretCmd;
 pub use mix_mpk::MixMpkCmd;
+pub use unload_mek::UnloadMekCmd;
 
 use crate::{Drivers, PauserPrivileges};
 
@@ -904,7 +910,8 @@ pub struct OcpLockContext {
 
 impl OcpLockContext {
     pub fn new(soc_ifc: &SocIfc, trng: &mut Trng, hek_available: bool) -> CaliptraResult<Self> {
-        let available = cfg!(feature = "ocp-lock") && soc_ifc.ocp_lock_enabled();
+        let available =
+            cfg!(feature = "ocp-lock") && soc_ifc.ocp_lock_enabled() && soc_ifc.subsystem_mode();
         Ok(Self {
             available,
             intermediate_secret: None,
@@ -1046,6 +1053,7 @@ impl OcpLockContext {
         &mut self,
         sha: &mut Sha3,
         ml_kem: &mut MlKem1024,
+        ecc: &mut Ecc384,
         hmac: &mut Hmac,
         trng: &mut Trng,
         aes: &mut Aes,
@@ -1056,9 +1064,9 @@ impl OcpLockContext {
         tag: &[u8; 16],
         ct: &[u8; AccessKey::<Current>::KEY_LEN],
     ) -> CaliptraResult<AccessKey<Current>> {
-        let mut ctx = self
-            .hpke_context
-            .decap(sha, ml_kem, hmac, trng, hpke_handle, enc, info)?;
+        let mut ctx =
+            self.hpke_context
+                .decap(sha, ml_kem, ecc, hmac, trng, hpke_handle, enc, info)?;
         AccessKey::<Current>::from_ciphertext(aes, trng, &mut ctx, metadata, tag, ct)
     }
 
@@ -1068,6 +1076,7 @@ impl OcpLockContext {
         &mut self,
         sha: &mut Sha3,
         ml_kem: &mut MlKem1024,
+        ecc: &mut Ecc384,
         hmac: &mut Hmac,
         trng: &mut Trng,
         aes: &mut Aes,
@@ -1078,9 +1087,9 @@ impl OcpLockContext {
         current: &EncryptedAccessKey<Current>,
         new: &EncryptedAccessKey<New>,
     ) -> CaliptraResult<(AccessKey<Current>, AccessKey<New>)> {
-        let mut ctx = self
-            .hpke_context
-            .decap(sha, ml_kem, hmac, trng, hpke_handle, enc, info)?;
+        let mut ctx =
+            self.hpke_context
+                .decap(sha, ml_kem, ecc, hmac, trng, hpke_handle, enc, info)?;
         let current = AccessKey::<Current>::from_ciphertext(
             aes,
             trng,
@@ -1274,24 +1283,56 @@ impl OcpLockContext {
     }
 
     /// Retrieve the public key for the HPKE handle
+    #[allow(clippy::too_many_arguments)]
     pub fn get_hpke_public_key(
         &mut self,
         sha: &mut Sha3,
         ml_kem: &mut MlKem1024,
+        ecc: &mut Ecc384,
+        trng: &mut Trng,
+        hmac: &mut Hmac,
         hpke_handle: &HpkeHandle,
         pub_out: &mut [u8],
     ) -> CaliptraResult<usize> {
         self.hpke_context
-            .get_pub_key(sha, ml_kem, hpke_handle, pub_out)
+            .get_pub_key(sha, ml_kem, ecc, trng, hmac, hpke_handle, pub_out)
     }
 
     /// Retrieve the Ciphersuite for an HPKE handle
     pub fn get_hpke_cipher_suite(
         &mut self,
         hpke_handle: &HpkeHandle,
-    ) -> CaliptraResult<CipherSuite> {
+    ) -> CaliptraResult<HpkeCipherSuite> {
         self.hpke_context.get_cipher_suite(hpke_handle)
     }
+}
+
+type Millisecond = u32;
+type Picosecond = u64;
+
+fn timeout_to_mtime(command_timeout: Millisecond, clock_period: Picosecond) -> u64 {
+    // MAX_TIMEOUT is one hour. The actual value is TBD
+    const MAX_TIMEOUT: Millisecond = 60 * 60 * 1000;
+    const ONE_MS_IN_PS: Picosecond = 1_000_000_000u64;
+
+    fn ms_to_ps(time_in_ms: Millisecond) -> Picosecond {
+        (time_in_ms as u64) * ONE_MS_IN_PS
+    }
+
+    fn walltime_to_mtime(walltime: Millisecond, period: Picosecond) -> Picosecond {
+        ms_to_ps(walltime).div_ceil(period)
+    }
+
+    let bounded_command_timeout: Millisecond = command_timeout.min(MAX_TIMEOUT);
+
+    // To avoid division by 0, 0 will be replaced by 2500.
+    // 2500 is computed from Caliptra's validated frequency 400MHz.
+    let period = match clock_period {
+        0 => 2500u64,
+        non_zero => non_zero,
+    };
+
+    walltime_to_mtime(bounded_command_timeout, period)
 }
 
 /// Entry point for OCP LOCK commands
@@ -1334,6 +1375,9 @@ pub fn command_handler(
         CommandId::OCP_LOCK_REWRAP_MPK => RewrapMpkCmd::execute(drivers, cmd_bytes, resp),
         CommandId::OCP_LOCK_ENABLE_MPK => EnableMpkCmd::execute(drivers, cmd_bytes, resp),
         CommandId::OCP_LOCK_TEST_ACCESS_KEY => TestAccessKeyCmd::execute(drivers, cmd_bytes, resp),
+        CommandId::OCP_LOCK_GET_STATUS => GetStatusCmd::execute(drivers, cmd_bytes, resp),
+        CommandId::OCP_LOCK_CLEAR_KEY_CACHE => ClearKeyCacheCmd::execute(drivers, cmd_bytes, resp),
+        CommandId::OCP_LOCK_UNLOAD_MEK => UnloadMekCmd::execute(drivers, cmd_bytes, resp),
         _ => Err(CaliptraError::RUNTIME_UNIMPLEMENTED_COMMAND),
     }
 }

@@ -29,6 +29,7 @@ exclude = [
 
 members = [
   "api",
+  "api/test-fw",
   "api/types",
   "auth-manifest/app",
   "auth-manifest/gen",
@@ -69,6 +70,7 @@ members = [
   "ureg/lib/codegen",
   "ureg/lib/systemrdl",
   "x509",
+  "x509/gen",
   "kat",
   "image/types",
   "image/gen",
@@ -86,6 +88,7 @@ members = [
   "test",
   "test-harness",
   "test-harness/types",
+  "xtask",
   "zero_bin",
 ]
 
@@ -121,7 +124,6 @@ caliptra-emu-derive = { path = "sw-emulator/lib/derive" }
 caliptra-emu-periph = { path = "sw-emulator/lib/periph" }
 caliptra-emu-types = { path = "sw-emulator/lib/types" }
 caliptra-error = { path = "error", default-features = false }
-caliptra-fpga-boss = { path = "ci-tools/fpga-boss" }
 caliptra-gen-linker-scripts = { path = "cpu/gen" }
 caliptra-hw-model = { path = "hw-model" }
 caliptra-hw-model-types = { path = "hw-model/types" }
@@ -154,7 +156,14 @@ cbindgen = { version = "0.24.0", default-features = false }
 cfg-if = "1.0.0"
 chrono = "0.4"
 cipher = "0.4.4"
-clap = { version = "3.2.14", default-features = false, features = ["std"] }
+clap = { version = "4.5.23", features = [
+    "cargo",
+    "derive",
+    "env",
+    "string",
+    "unicode",
+    "wrap_help",
+] }
 const-random = "0.1.18"
 constant_time_eq = "0.3.0"
 convert_case = "0.6.0"
@@ -171,28 +180,24 @@ hex = { version = "0.4.3", features = ["serde"] }
 hkdf = "0.12.4"
 hmac = "0.12.1"
 lazy_static = "1.4.0"
-libftdi1-sys = { version = "1.1.2", features = ["libusb1-sys"] }
-libusb1-sys = "0.6.4"
+log = "0.4.26"
 memoffset = "0.8.0"
 ml-kem = { version = "0.2.1", features = ["deterministic"] }
 once_cell = "1.13"
 openssl = { version = "0.10", features = ["vendored"] }
-ocp-eat = { path = "common/eat", default-features = false }
 p384 = "0.13.0"
 proc-macro2 = "1.0.66"
 quote = "1.0"
 rand = "0.8"
 rfc6979 = "0.4.0"
-rusb = "0.9.3"
 rustix = { version = "1", features = ["event", "fs", "net", "process", "stdio", "termios"] }
 scopeguard = "1.2"
 serde = "1.0"
 serde_derive = "1.0.136"
 serde_json = "1.0"
-sha1 = "0.10.6"
 sha2 = { version = "0.10.8", default-features = false, features = ["compress"] }
 sha3 = "0.10.8"
-signature = "2.2.0"
+simple_logger = "5.0.0"
 smlang = "0.8.0"
 spki = { version = "0.7.3", features = ["alloc"] }
 syn = "1.0.107"
@@ -221,12 +226,12 @@ itertools = { version = "0.12.0", default-features = false }
 riscv = "0.13.0"
 
 # DPE dependencies; keep git revs in sync alongside test/dpe_verification/go.mod
-dpe = { git = "https://github.com/chipsalliance/caliptra-dpe", rev = "4986ac50d82b415d69eb73a44dfff1d776d5f762", default-features = false, features = ["p384"] }
-crypto = { git = "https://github.com/chipsalliance/caliptra-dpe", rev = "4986ac50d82b415d69eb73a44dfff1d776d5f762", default-features = false }
-platform = { git = "https://github.com/chipsalliance/caliptra-dpe", rev = "4986ac50d82b415d69eb73a44dfff1d776d5f762", default-features = false }
+dpe = { git = "https://github.com/chipsalliance/caliptra-dpe", rev = "a26db5b869f13f0d2c5762b75f8892b9fe2d8055", default-features = false, features = ["hybrid"] }
+crypto = { git = "https://github.com/chipsalliance/caliptra-dpe", rev = "a26db5b869f13f0d2c5762b75f8892b9fe2d8055", default-features = false }
+platform = { git = "https://github.com/chipsalliance/caliptra-dpe", rev = "a26db5b869f13f0d2c5762b75f8892b9fe2d8055", default-features = false }
 
 # local DPE dependency; useful when developing
-# dpe = { path = "../caliptra-dpe/dpe", default-features = false, features = ["p384"] }
+# dpe = { path = "../caliptra-dpe/dpe", default-features = false, features = ["hybrid"] }
 # crypto = { path = "../caliptra-dpe/crypto", default-features = false }
 # platform = { path = "../caliptra-dpe/platform", default-features = false }
 
