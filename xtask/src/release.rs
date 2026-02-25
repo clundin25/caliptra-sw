@@ -3,97 +3,148 @@
 use anyhow::{bail, Result};
 use std::fs;
 use std::io::{self, Write};
+use std::str::FromStr;
 
-pub(crate) fn release(tag: &str) -> Result<()> {
-    let parts: Vec<&str> = tag.split('-').collect();
-    if parts.len() != 2 {
-        bail!("Invalid tag format. Expected component-major.minor.patch (e.g., fmc-1.2.3)");
-    }
-    let component = parts[0];
-    let version = parts[1];
-    let version_parts: Vec<&str> = version.split('.').collect();
-    if version_parts.len() != 3 {
-        bail!("Invalid version format. Expected major.minor.patch (e.g., 1.2.3)");
-    }
-    let major: u32 = version_parts[0].parse()?;
-    let minor: u32 = version_parts[1].parse()?;
-    let patch: u32 = version_parts[2].parse()?;
+#[derive(Debug)]
+struct ReleaseTag {
+    component: String,
+    major: u32,
+    minor: u32,
+    patch: u32,
+}
 
-    println!("Verifying version for {} to be {}.{}.{}\n", component, major, minor, patch);
+impl FromStr for ReleaseTag {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<&str> = s.split('-').collect();
+        if parts.len() != 2 {
+            bail!("Invalid tag format. Expected component-major.minor.patch (e.g., fmc-1.2.3)");
+        }
+        let component = parts[0].to_string();
+        let version = parts[1];
+        let version_parts: Vec<&str> = version.split('.').collect();
+        if version_parts.len() != 3 {
+            bail!("Invalid version format. Expected major.minor.patch (e.g., 1.2.3)");
+        }
+        let major: u32 = version_parts[0].parse()?;
+        let minor: u32 = version_parts[1].parse()?;
+        let patch: u32 = version_parts[2].parse()?;
+
+        Ok(ReleaseTag {
+            component,
+            major,
+            minor,
+            patch,
+        })
+    }
+}
+
+fn verify_rom(tag: &ReleaseTag, version_rs: &str, common_rs: &str, readme: &str) -> Result<()> {
+    let major = tag.major;
+    let minor = tag.minor;
+    let patch = tag.patch;
+
+    if !version_rs.contains(&format!("pub const ROM_VERSION_MAJOR: u16 = {};", major)) ||
+       !version_rs.contains(&format!("pub const ROM_VERSION_MINOR: u16 = {};", minor)) ||
+       !version_rs.contains(&format!("pub const ROM_VERSION_PATCH: u16 = {};", patch)) {
+        bail!("builder/src/version.rs does not have correct ROM version");
+    }
+
+    let rom_hex = ((major & 0x1F) << 11) | ((minor & 0x1F) << 6) | (patch & 0x3F);
+    let expected_hex = format!("0x{:04x}", rom_hex);
+    if !common_rs.contains(&expected_hex) {
+        bail!("test/tests/fips_test_suite/common.rs does not contain expected ROM hex version {}", expected_hex);
+    }
+
+    if !readme.contains(&format!("v{}.{}", major, minor)) {
+        bail!("rom/dev/README.md does not contain expected version v{}.{}", major, minor);
+    }
+    Ok(())
+}
+
+fn verify_fmc(tag: &ReleaseTag, version_rs: &str, common_rs: &str, toml: &str, readme: &str) -> Result<()> {
+    let major = tag.major;
+    let minor = tag.minor;
+    let patch = tag.patch;
+
+    if !version_rs.contains(&format!("pub const FMC_VERSION_MAJOR: u16 = {};", major)) ||
+       !version_rs.contains(&format!("pub const FMC_VERSION_MINOR: u16 = {};", minor)) ||
+       !version_rs.contains(&format!("pub const FMC_VERSION_PATCH: u16 = {};", patch)) {
+        bail!("builder/src/version.rs does not have correct FMC version");
+    }
+
+    let fmc_hex = ((major & 0x1F) << 11) | ((minor & 0x1F) << 6) | (patch & 0x3F);
+    let expected_hex = format!("0x{:04x}", fmc_hex);
+
+    if !toml.contains(&format!("fmc_version = {}", expected_hex)) {
+        bail!("builder/test_data/default_image_options.toml does not contain expected FMC hex version {}", expected_hex);
+    }
+
+    if !common_rs.contains(&expected_hex) {
+        bail!("test/tests/fips_test_suite/common.rs does not contain expected FMC hex version {}", expected_hex);
+    }
+
+    if !readme.contains(&format!("v{}.{}", major, minor)) {
+        bail!("fmc/README.md does not contain expected version v{}.{}", major, minor);
+    }
+    Ok(())
+}
+
+fn verify_fw(tag: &ReleaseTag, version_rs: &str, common_rs: &str, toml: &str, readme: &str) -> Result<()> {
+    let major = tag.major;
+    let minor = tag.minor;
+    let patch = tag.patch;
+
+    if !version_rs.contains(&format!("pub const RUNTIME_VERSION_MAJOR: u32 = {};", major)) ||
+       !version_rs.contains(&format!("pub const RUNTIME_VERSION_MINOR: u32 = {};", minor)) ||
+       !version_rs.contains(&format!("pub const RUNTIME_VERSION_PATCH: u32 = {};", patch)) {
+        bail!("builder/src/version.rs does not have correct RUNTIME version");
+    }
+
+    let fw_hex = ((major & 0xFF) << 24) | ((minor & 0xFF) << 16) | (patch & 0xFFFF);
+    
+    if !toml.contains(&format!("app_version = 0x{:x}", fw_hex)) {
+        bail!("builder/test_data/default_image_options.toml does not contain expected FW hex version 0x{:x}", fw_hex);
+    }
+
+    let common_rs_clean = common_rs.replace("_", "");
+    if !common_rs_clean.contains(&format!("0x{:08x}", fw_hex)) {
+        bail!("test/tests/fips_test_suite/common.rs does not contain expected FW hex version 0x{:08x}", fw_hex);
+    }
+
+    if !readme.contains(&format!("v{}.{}", major, minor)) {
+        bail!("runtime/README.md does not contain expected version v{}.{}", major, minor);
+    }
+    Ok(())
+}
+
+pub(crate) fn release(tag_str: &str) -> Result<()> {
+    let tag: ReleaseTag = tag_str.parse()?;
+
+    println!("Verifying version for {} to be {}.{}.{}\n", tag.component, tag.major, tag.minor, tag.patch);
 
     let version_rs = fs::read_to_string("builder/src/version.rs")?;
     let common_rs = fs::read_to_string("test/tests/fips_test_suite/common.rs")?;
     let toml = fs::read_to_string("builder/test_data/default_image_options.toml")?;
 
-    match component {
+    match tag.component.as_str() {
         "rom" => {
-            if !version_rs.contains(&format!("pub const ROM_VERSION_MAJOR: u16 = {};", major)) ||
-               !version_rs.contains(&format!("pub const ROM_VERSION_MINOR: u16 = {};", minor)) ||
-               !version_rs.contains(&format!("pub const ROM_VERSION_PATCH: u16 = {};", patch)) {
-                bail!("builder/src/version.rs does not have correct ROM version");
-            }
-
-            let rom_hex = ((major & 0x1F) << 11) | ((minor & 0x1F) << 6) | (patch & 0x3F);
-            let expected_hex = format!("0x{:04x}", rom_hex);
-            if !common_rs.contains(&expected_hex) {
-                bail!("test/tests/fips_test_suite/common.rs does not contain expected ROM hex version {}", expected_hex);
-            }
-
             let readme = fs::read_to_string("rom/dev/README.md")?;
-            if !readme.contains(&format!("v{}.{}", major, minor)) {
-                bail!("rom/dev/README.md does not contain expected version v{}.{}", major, minor);
-            }
+            verify_rom(&tag, &version_rs, &common_rs, &readme)?;
         }
         "fmc" => {
-            if !version_rs.contains(&format!("pub const FMC_VERSION_MAJOR: u16 = {};", major)) ||
-               !version_rs.contains(&format!("pub const FMC_VERSION_MINOR: u16 = {};", minor)) ||
-               !version_rs.contains(&format!("pub const FMC_VERSION_PATCH: u16 = {};", patch)) {
-                bail!("builder/src/version.rs does not have correct FMC version");
-            }
-
-            let fmc_hex = ((major & 0x1F) << 11) | ((minor & 0x1F) << 6) | (patch & 0x3F);
-            let expected_hex = format!("0x{:04x}", fmc_hex);
-
-            if !toml.contains(&format!("fmc_version = {}", expected_hex)) {
-                bail!("builder/test_data/default_image_options.toml does not contain expected FMC hex version {}", expected_hex);
-            }
-
-            if !common_rs.contains(&expected_hex) {
-                bail!("test/tests/fips_test_suite/common.rs does not contain expected FMC hex version {}", expected_hex);
-            }
-
             let readme = fs::read_to_string("fmc/README.md")?;
-            if !readme.contains(&format!("v{}.{}", major, minor)) {
-                bail!("fmc/README.md does not contain expected version v{}.{}", major, minor);
-            }
+            verify_fmc(&tag, &version_rs, &common_rs, &toml, &readme)?;
         }
         "fw" => {
-            if !version_rs.contains(&format!("pub const RUNTIME_VERSION_MAJOR: u32 = {};", major)) ||
-               !version_rs.contains(&format!("pub const RUNTIME_VERSION_MINOR: u32 = {};", minor)) ||
-               !version_rs.contains(&format!("pub const RUNTIME_VERSION_PATCH: u32 = {};", patch)) {
-                bail!("builder/src/version.rs does not have correct RUNTIME version");
-            }
-
-            let fw_hex = ((major & 0xFF) << 24) | ((minor & 0xFF) << 16) | (patch & 0xFFFF);
-            
-            if !toml.contains(&format!("app_version = 0x{:x}", fw_hex)) {
-                bail!("builder/test_data/default_image_options.toml does not contain expected FW hex version 0x{:x}", fw_hex);
-            }
-
-            let common_rs_clean = common_rs.replace("_", "");
-            if !common_rs_clean.contains(&format!("0x{:08x}", fw_hex)) {
-                bail!("test/tests/fips_test_suite/common.rs does not contain expected FW hex version 0x{:08x}", fw_hex);
-            }
-
             let readme = fs::read_to_string("runtime/README.md")?;
-            if !readme.contains(&format!("v{}.{}", major, minor)) {
-                bail!("runtime/README.md does not contain expected version v{}.{}", major, minor);
-            }
+            verify_fw(&tag, &version_rs, &common_rs, &toml, &readme)?;
         }
-        _ => bail!("Unknown component '{}'. Expected 'rom', 'fmc', or 'fw'", component),
+        _ => bail!("Unknown component '{}'. Expected 'rom', 'fmc', or 'fw'", tag.component),
     }
 
-    println!("All version checks passed for {} {}.{}.{}!\n", component, major, minor, patch);
+    println!("All version checks passed for {} {}.{}.{}!\n", tag.component, tag.major, tag.minor, tag.patch);
 
     println!("Caliptra Firmware Release Process");
     println!("=================================\n");
