@@ -19,15 +19,17 @@ fn build_rom_images(work_dir: &Path) -> Result<()> {
 
     let build_rom = |path: &std::path::Path, flag: &str| -> Result<()> {
         let _ = fs::remove_dir_all(&target_elf_dir);
-        let status = std::process::Command::new("cargo")
+        let output = std::process::Command::new("cargo")
             .env("CALIPTRA_IMAGE_NO_GIT_REVISION", "1")
             .args([
                 "--config", extra_cargo_config,
                 "run", "-p", "caliptra-builder", "--",
                 flag, path.to_str().unwrap()
             ])
-            .status()?;
-        if !status.success() {
+            .output()?;
+        if !output.status.success() {
+            error!("{}", String::from_utf8_lossy(&output.stdout));
+            error!("{}", String::from_utf8_lossy(&output.stderr));
             bail!("Failed to build ROM with {}", flag);
         }
         Ok(())
@@ -75,15 +77,17 @@ pub(crate) fn check_frozen_images() -> Result<()> {
 
     let frozen_image_file = std::env::current_dir()?.join("FROZEN_IMAGES.sha384sum");
     
-    let status = std::process::Command::new("sha384sum")
+    let output = std::process::Command::new("sha384sum")
         .current_dir(&work_dir)
         .arg("-c")
         .arg(&frozen_image_file)
-        .status()?;
+        .output()?;
 
     let _ = fs::remove_dir_all(&work_dir);
 
-    if !status.success() {
+    if !output.status.success() {
+        error!("{}", String::from_utf8_lossy(&output.stdout));
+        error!("{}", String::from_utf8_lossy(&output.stderr));
         error!("The Caliptra ROM is frozen; changes that affect the binary");
         error!("require approval from the TAC.");
         error!("");
