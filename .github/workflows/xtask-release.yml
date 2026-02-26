@@ -31,6 +31,7 @@ jobs:
         run: |
           git config --global user.name "GitHub CI"
           git config --global user.email "username@users.noreply.github.com"
+          git remote rename origin release-repo
 
       - name: Install required packages
         run: |

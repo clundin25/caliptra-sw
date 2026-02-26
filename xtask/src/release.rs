@@ -283,7 +283,7 @@ async fn deploy_async(tag_str: &str) -> Result<()> {
     }
     let crab = builder.build()?;
 
-    let output = std::process::Command::new("git").args(["remote", "get-url", "origin"]).output()?;
+    let output = std::process::Command::new("git").args(["remote", "get-url", "release-repo"]).output()?;
     let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
     
     let (owner, repo) = if url.contains("github.com") {
@@ -325,13 +325,13 @@ async fn deploy_async(tag_str: &str) -> Result<()> {
         bail!("Failed to create git tag '{}'", tag_str);
     }
 
-    info!("Pushing git tag to origin: {}", tag_str);
+    info!("Pushing git tag to release-repo: {}", tag_str);
     let push_status = std::process::Command::new("git")
-        .args(["push", "origin", tag_str])
+        .args(["push", "release-repo", tag_str])
         .status()?;
 
     if !push_status.success() {
-        bail!("Failed to push git tag '{}' to origin", tag_str);
+        bail!("Failed to push git tag '{}' to release-repo", tag_str);
     }
 
     info!("Successfully deployed tag {}", tag_str);
