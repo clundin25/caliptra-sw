@@ -108,22 +108,22 @@ fn verify_fmc(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
     Ok(())
 }
 
-fn verify_fw(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
+fn verify_rt(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
     verify_common(tag, files, "RUNTIME", "u32", "runtime/README.md")?;
 
     let major = tag.major;
     let minor = tag.minor;
     let patch = tag.patch;
 
-    let fw_hex = ((major & 0xFF) << 24) | ((minor & 0xFF) << 16) | (patch & 0xFFFF);
+    let rt_hex = ((major & 0xFF) << 24) | ((minor & 0xFF) << 16) | (patch & 0xFFFF);
     
-    if !files.toml.contains(&format!("app_version = 0x{:x}", fw_hex)) {
-        bail!("builder/test_data/default_image_options.toml does not contain expected FW hex version 0x{:x}", fw_hex);
+    if !files.toml.contains(&format!("app_version = 0x{:x}", rt_hex)) {
+        bail!("builder/test_data/default_image_options.toml does not contain expected FW hex version 0x{:x}", rt_hex);
     }
 
     let common_rs_clean = files.common_rs.replace("_", "");
-    if !common_rs_clean.contains(&format!("0x{:08x}", fw_hex)) {
-        bail!("test/tests/fips_test_suite/common.rs does not contain expected FW hex version 0x{:08x}", fw_hex);
+    if !common_rs_clean.contains(&format!("0x{:08x}", rt_hex)) {
+        bail!("test/tests/fips_test_suite/common.rs does not contain expected FW hex version 0x{:08x}", rt_hex);
     }
 
     Ok(())
@@ -149,12 +149,12 @@ pub(crate) fn check(tag_str: &str) -> Result<()> {
             let files = ReleaseRelevantFiles { version_rs, common_rs, toml, readme };
             verify_fmc(&tag, &files)?;
         }
-        "fw" => {
+        "rt" => {
             let readme = fs::read_to_string("runtime/README.md")?;
             let files = ReleaseRelevantFiles { version_rs, common_rs, toml, readme };
-            verify_fw(&tag, &files)?;
+            verify_rt(&tag, &files)?;
         }
-        _ => bail!("Unknown component '{}'. Expected 'rom', 'fmc', or 'fw'", tag.component),
+        _ => bail!("Unknown component '{}'. Expected 'rom', 'fmc', or 'rt'", tag.component),
     }
 
     info!("All version checks passed for {} {}.{}.{}!\n", tag.component, tag.major, tag.minor, tag.patch);
