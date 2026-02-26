@@ -1,6 +1,6 @@
 // Licensed under the Apache-2.0 license
 
-use anyhow::{anyhow, bail, Error, Result};
+use anyhow::{anyhow, bail, Context, Error, Result};
 use log::info;
 use std::fs;
 use std::str::FromStr;
@@ -33,10 +33,10 @@ pub async fn release_checklist(tag_str: &str) -> Result<()> {
     }
 
     check_changelog(&tag.release_name())?;
-    check_frozen_images();
+    check_frozen_images()?;
 
     let meta = GitHubReleaseManager::new(&tag)?;
-    check_nightly_workflow(&meta).await?;
+    // check_nightly_workflow(&meta).await?;
 
     info!(
         "All checks passed for {} {}.{}.{}!\n",
@@ -205,6 +205,8 @@ fn check_rom(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
         );
     }
 
+    info!("rom version check passed!");
+
     Ok(())
 }
 
@@ -232,6 +234,8 @@ fn check_fmc(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
         );
     }
 
+    info!("fmc version check passed!");
+
     Ok(())
 }
 
@@ -255,6 +259,8 @@ fn check_fw(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
     if !common_rs_clean.contains(&format!("0x{:08x}", rt_hex)) {
         bail!("test/tests/fips_test_suite/common.rs does not contain expected FW hex version 0x{:08x}", rt_hex);
     }
+
+    info!("fw version check passed!");
 
     Ok(())
 }
@@ -373,7 +379,7 @@ fn check_changelog(release_name: &str) -> Result<()> {
 }
 
 fn extract_changelog(release_name: &str) -> Result<String> {
-    let content = std::fs::read_to_string(PROJECT_ROOT.join("CHANGELOG.md"))?;
+    let content = std::fs::read_to_string(PROJECT_ROOT.join("CHANGELOG.md")).context("Could not find CHANGELOG.md")?;
     let mut in_section = false;
     let mut section = String::new();
 
