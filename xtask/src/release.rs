@@ -209,6 +209,34 @@ pub(crate) fn check(tag_str: &str) -> Result<()> {
 }
 
 pub(crate) fn deploy(tag_str: &str) -> Result<()> {
+    let head_output = std::process::Command::new("git").args(["rev-parse", "HEAD"]).output()?;
+    let head_commit = String::from_utf8_lossy(&head_output.stdout).trim().to_string();
+
+    info!("Checking if nightly release workflow passed for commit {}...", head_commit);
+    
+    let gh_output = std::process::Command::new("gh")
+        .args([
+            "run", "list",
+            "--commit", &head_commit,
+            "--workflow", "nightly-release.yml",
+            "--json", "conclusion",
+            "--jq", ".[0].conclusion"
+        ])
+        .output()?;
+
+    if !gh_output.status.success() {
+        log::error!("{}", String::from_utf8_lossy(&gh_output.stdout));
+        log::error!("{}", String::from_utf8_lossy(&gh_output.stderr));
+        bail!("Failed to query GitHub CLI for nightly workflow status. Ensure 'gh' is installed and authenticated.");
+    }
+
+    let conclusion = String::from_utf8_lossy(&gh_output.stdout).trim().to_string();
+    if conclusion != "success" {
+        bail!("Nightly workflow for commit {} did not succeed (status: '{}'). Cannot deploy.", head_commit, conclusion);
+    }
+
+    info!("Nightly workflow passed! Proceeding with deployment.");
+
     check(tag_str)?;
     
     info!("Creating git tag: {}", tag_str);
