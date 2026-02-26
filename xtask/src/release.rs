@@ -218,29 +218,39 @@ struct WorkflowRun {
     conclusion: Option<String>,
 }
 
-async fn check_nightly_workflow(crab: &octocrab::Octocrab, owner: &str, repo: &str, head_commit: &str) -> Result<()> {
-    let url = format!("/repos/{}/{}/actions/workflows/nightly-release.yml/runs?head_sha={}", owner, repo, head_commit);
-    let runs: WorkflowRuns = crab.get(url, None::<&()>).await?;
+struct ReleaseMetadata {
+    crab: octocrab::Octocrab,
+    owner: String,
+    repo: String,
+    head_commit: String,
+    tag_str: String,
+    component: String,
+    version_str: String,
+}
 
-    let run = runs.workflow_runs.into_iter().next().ok_or_else(|| anyhow::anyhow!("No nightly workflow run found for commit {}", head_commit))?;
+async fn check_nightly_workflow(meta: &ReleaseMetadata) -> Result<()> {
+    let url = format!("/repos/{}/{}/actions/workflows/nightly-release.yml/runs?head_sha={}", meta.owner, meta.repo, meta.head_commit);
+    let runs: WorkflowRuns = meta.crab.get(url, None::<&()>).await?;
+
+    let run = runs.workflow_runs.into_iter().next().ok_or_else(|| anyhow::anyhow!("No nightly workflow run found for commit {}", meta.head_commit))?;
     
     let conclusion = run.conclusion.unwrap_or_else(|| "in_progress".to_string());
     if conclusion != "success" {
-        bail!("Nightly workflow for commit {} did not succeed (status: '{}'). Cannot deploy.", head_commit, conclusion);
+        bail!("Nightly workflow for commit {} did not succeed (status: '{}'). Cannot deploy.", meta.head_commit, conclusion);
     }
     Ok(())
 }
 
-async fn create_github_release(crab: &octocrab::Octocrab, owner: &str, repo: &str, tag_str: &str, component: &str, version: &str) -> Result<()> {
-    info!("Creating GitHub release for tag {}...", tag_str);
+async fn create_github_release(meta: &ReleaseMetadata) -> Result<()> {
+    info!("Creating GitHub release for tag {}...", meta.tag_str);
     
-    let release_name = format!("{}-{}", component.to_uppercase(), version);
+    let release_name = format!("{}-{}", meta.component.to_uppercase(), meta.version_str);
     
     let release_body = format!("Release {}", release_name);
     // octocrab exposes repos().releases().create()
-    let release = crab.repos(owner, repo)
+    let release = meta.crab.repos(&meta.owner, &meta.repo)
         .releases()
-        .create(tag_str)
+        .create(&meta.tag_str)
         .name(&release_name)
         .body(&release_body)
         .draft(false)
@@ -283,9 +293,21 @@ pub(crate) fn deploy(tag_str: &str) -> Result<()> {
         ("chipsalliance".to_string(), "caliptra-sw".to_string())
     };
 
+    let version_str = format!("{}.{}.{}", tag.major, tag.minor, tag.patch);
+
+    let meta = ReleaseMetadata {
+        crab,
+        owner,
+        repo,
+        head_commit,
+        tag_str: tag_str.to_string(),
+        component: tag.component.clone(),
+        version_str,
+    };
+
     let rt = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
     
-    rt.block_on(check_nightly_workflow(&crab, &owner, &repo, &head_commit))?;
+    rt.block_on(check_nightly_workflow(&meta))?;
 
     info!("Nightly workflow passed! Proceeding with deployment.");
 
@@ -311,8 +333,7 @@ pub(crate) fn deploy(tag_str: &str) -> Result<()> {
 
     info!("Successfully deployed tag {}", tag_str);
     
-    let version_str = format!("{}.{}.{}", tag.major, tag.minor, tag.patch);
-    rt.block_on(create_github_release(&crab, &owner, &repo, tag_str, &tag.component, &version_str))?;
+    rt.block_on(create_github_release(&meta))?;
 
     Ok(())
 }
