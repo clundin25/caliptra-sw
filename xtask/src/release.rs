@@ -208,32 +208,58 @@ pub(crate) fn check(tag_str: &str) -> Result<()> {
     Ok(())
 }
 
+#[derive(serde::Deserialize, Debug)]
+struct WorkflowRuns {
+    workflow_runs: Vec<WorkflowRun>,
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct WorkflowRun {
+    conclusion: Option<String>,
+}
+
+async fn check_nightly_workflow(head_commit: &str) -> Result<()> {
+    let token = std::env::var("GH_TOKEN").or_else(|_| std::env::var("GITHUB_TOKEN")).unwrap_or_default();
+    let mut builder = octocrab::Octocrab::builder();
+    if !token.is_empty() {
+        builder = builder.personal_token(token);
+    }
+    let crab = builder.build()?;
+
+    let output = std::process::Command::new("git").args(["remote", "get-url", "origin"]).output()?;
+    let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    
+    let (owner, repo) = if url.contains("github.com") {
+        let path = url.split("github.com").last().unwrap().trim_start_matches(&[':', '/'][..]).trim_end_matches(".git");
+        let parts: Vec<&str> = path.split('/').collect();
+        if parts.len() == 2 {
+            (parts[0].to_string(), parts[1].to_string())
+        } else {
+            ("chipsalliance".to_string(), "caliptra-sw".to_string())
+        }
+    } else {
+        ("chipsalliance".to_string(), "caliptra-sw".to_string())
+    };
+
+    let url = format!("/repos/{}/{}/actions/workflows/nightly-release.yml/runs?head_sha={}", owner, repo, head_commit);
+    let runs: WorkflowRuns = crab.get(url, None::<&()>).await?;
+
+    let run = runs.workflow_runs.into_iter().next().ok_or_else(|| anyhow::anyhow!("No nightly workflow run found for commit {}", head_commit))?;
+    
+    let conclusion = run.conclusion.unwrap_or_else(|| "in_progress".to_string());
+    if conclusion != "success" {
+        bail!("Nightly workflow for commit {} did not succeed (status: '{}'). Cannot deploy.", head_commit, conclusion);
+    }
+    Ok(())
+}
+
 pub(crate) fn deploy(tag_str: &str) -> Result<()> {
     let head_output = std::process::Command::new("git").args(["rev-parse", "HEAD"]).output()?;
     let head_commit = String::from_utf8_lossy(&head_output.stdout).trim().to_string();
 
     info!("Checking if nightly release workflow passed for commit {}...", head_commit);
     
-    let gh_output = std::process::Command::new("gh")
-        .args([
-            "run", "list",
-            "--commit", &head_commit,
-            "--workflow", "nightly-release.yml",
-            "--json", "conclusion",
-            "--jq", ".[0].conclusion"
-        ])
-        .output()?;
-
-    if !gh_output.status.success() {
-        log::error!("{}", String::from_utf8_lossy(&gh_output.stdout));
-        log::error!("{}", String::from_utf8_lossy(&gh_output.stderr));
-        bail!("Failed to query GitHub CLI for nightly workflow status. Ensure 'gh' is installed and authenticated.");
-    }
-
-    let conclusion = String::from_utf8_lossy(&gh_output.stdout).trim().to_string();
-    if conclusion != "success" {
-        bail!("Nightly workflow for commit {} did not succeed (status: '{}'). Cannot deploy.", head_commit, conclusion);
-    }
+    tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(check_nightly_workflow(&head_commit))?;
 
     info!("Nightly workflow passed! Proceeding with deployment.");
 
