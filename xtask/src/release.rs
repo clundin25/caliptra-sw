@@ -264,6 +264,11 @@ async fn create_github_release(meta: &ReleaseMetadata) -> Result<()> {
 }
 
 pub(crate) fn deploy(tag_str: &str) -> Result<()> {
+    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+    rt.block_on(deploy_async(tag_str))
+}
+
+async fn deploy_async(tag_str: &str) -> Result<()> {
     let tag: ReleaseTag = tag_str.parse()?;
     
     let head_output = std::process::Command::new("git").args(["rev-parse", "HEAD"]).output()?;
@@ -304,10 +309,8 @@ pub(crate) fn deploy(tag_str: &str) -> Result<()> {
         component: tag.component.clone(),
         version_str,
     };
-
-    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
     
-    rt.block_on(check_nightly_workflow(&meta))?;
+    check_nightly_workflow(&meta).await?;
 
     info!("Nightly workflow passed! Proceeding with deployment.");
 
@@ -333,7 +336,7 @@ pub(crate) fn deploy(tag_str: &str) -> Result<()> {
 
     info!("Successfully deployed tag {}", tag_str);
     
-    rt.block_on(create_github_release(&meta))?;
+    create_github_release(&meta).await?;
 
     Ok(())
 }
