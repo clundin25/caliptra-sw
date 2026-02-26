@@ -1,16 +1,13 @@
 // Licensed under the Apache-2.0 license
 
 use anyhow::{bail, Result};
-use log::info;
+use log::{error, info};
 use std::fs;
 use std::io::Write;
 use std::path::Path;
 
-pub(crate) fn update_frozen_images() -> Result<()> {
-    info!("Updating frozen images...");
-
-    let work_dir = std::env::temp_dir().join("caliptra_frozen_images");
-    let _ = fs::create_dir_all(&work_dir);
+fn build_rom_images(work_dir: &Path) -> Result<()> {
+    let _ = fs::create_dir_all(work_dir);
 
     let rom_with_log_path = work_dir.join("caliptra-rom-with-log.bin");
     let rom_no_log_path = work_dir.join("caliptra-rom-no-log.bin");
@@ -39,6 +36,15 @@ pub(crate) fn update_frozen_images() -> Result<()> {
     build_rom(&rom_with_log_path, "--rom-with-log")?;
     build_rom(&rom_no_log_path, "--rom-no-log")?;
 
+    Ok(())
+}
+
+pub(crate) fn update_frozen_images() -> Result<()> {
+    info!("Updating frozen images...");
+
+    let work_dir = std::env::temp_dir().join("caliptra_frozen_images");
+    build_rom_images(&work_dir)?;
+
     let status = std::process::Command::new("sha384sum")
         .current_dir(&work_dir)
         .args(["caliptra-rom-no-log.bin", "caliptra-rom-with-log.bin"])
@@ -57,6 +63,35 @@ pub(crate) fn update_frozen_images() -> Result<()> {
 
     info!("Successfully updated {}", frozen_image_file);
     let _ = fs::remove_dir_all(&work_dir);
+
+    Ok(())
+}
+
+pub(crate) fn check_frozen_images() -> Result<()> {
+    info!("Checking frozen images...");
+
+    let work_dir = std::env::temp_dir().join("caliptra_frozen_images");
+    build_rom_images(&work_dir)?;
+
+    let frozen_image_file = std::env::current_dir()?.join("FROZEN_IMAGES.sha384sum");
+    
+    let status = std::process::Command::new("sha384sum")
+        .current_dir(&work_dir)
+        .arg("-c")
+        .arg(&frozen_image_file)
+        .status()?;
+
+    let _ = fs::remove_dir_all(&work_dir);
+
+    if !status.success() {
+        error!("The Caliptra ROM is frozen; changes that affect the binary");
+        error!("require approval from the TAC.");
+        error!("");
+        error!("If you have approval, run `cargo xtask update-frozen-images`");
+        bail!("Frozen images check failed");
+    }
+
+    info!("Frozen images check passed!");
 
     Ok(())
 }
