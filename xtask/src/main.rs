@@ -37,7 +37,7 @@ enum Commands {
 
 #[derive(Subcommand)]
 pub enum ReleaseCommands {
-    /// Check the versions for a given release tag
+    /// Dry run release for the given release tag
     Check {
         /// The release tag to verify, formatted as component-major.minor.patch (e.g. fmc-2.0.0)
         tag: String,

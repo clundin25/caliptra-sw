@@ -5,12 +5,93 @@ use log::info;
 use std::fs;
 use std::str::FromStr;
 
-#[derive(Debug)]
+use crate::PROJECT_ROOT;
+
+pub async fn release_checklist(tag_str: &str) -> Result<()> {
+    let tag: ReleaseTag = tag_str.parse()?;
+
+    info!(
+        "Verifying version for {} to be {}.{}.{}\n",
+        tag.component, tag.major, tag.minor, tag.patch
+    );
+
+    let release_files = ReleaseRelevantFiles::new()?;
+    match tag.component.as_str() {
+        "rom" => {
+            check_rom(&tag, &release_files)?;
+        }
+        "fmc" => {
+            check_fmc(&tag, &release_files)?;
+        }
+        "fw" => {
+            check_fw(&tag, &release_files)?;
+        }
+        _ => bail!(
+            "Unknown component '{}'. Expected 'rom', 'fmc', or 'rt'",
+            tag.component
+        ),
+    }
+
+    check_changelog(&tag.release_name())?;
+    check_frozen_images();
+
+    let meta = GitHubReleaseManager::new(&tag)?;
+    check_nightly_workflow(&meta).await?;
+
+    info!(
+        "All checks passed for {} {}.{}.{}!\n",
+        tag.component, tag.major, tag.minor, tag.patch
+    );
+    Ok(())
+}
+
+async fn deploy_async(tag_str: &str) -> Result<()> {
+    release_checklist(tag_str).await?;
+
+    let tag: ReleaseTag = tag_str.parse()?;
+    let release_name = tag.release_name();
+
+    info!("Creating git tag: {}", release_name);
+    let tag_status = std::process::Command::new("git")
+        .args(["tag", &release_name])
+        .status()?;
+
+    if !tag_status.success() {
+        bail!("Failed to create git tag '{}'", release_name);
+    }
+
+    info!("Pushing git tag to release-repo: {}", release_name);
+    let push_status = std::process::Command::new("git")
+        .args(["push", "release-repo", &release_name])
+        .status()?;
+
+    if !push_status.success() {
+        bail!("Failed to push git tag '{}' to release-repo", release_name);
+    }
+
+    info!("Successfully deployed tag {}", tag_str);
+
+    let meta = GitHubReleaseManager::new(&tag)?;
+    create_github_release(&meta).await?;
+
+    Ok(())
+}
+
+#[derive(Clone, Debug)]
 struct ReleaseTag {
     component: String,
     major: u32,
     minor: u32,
     patch: u32,
+}
+
+impl ReleaseTag {
+    fn release_name(&self) -> String {
+        format!(
+            "{}-{}.{}.{}",
+            self.component, self.major, self.minor, self.patch
+        )
+    }
 }
 
 impl FromStr for ReleaseTag {
@@ -44,7 +125,30 @@ struct ReleaseRelevantFiles {
     version_rs: String,
     common_rs: String,
     toml: String,
-    readme: String,
+    rom_readme: String,
+    fmc_readme: String,
+    fw_readme: String,
+}
+
+impl ReleaseRelevantFiles {
+    fn new() -> Result<Self> {
+        let version_rs = fs::read_to_string(PROJECT_ROOT.join("builder/src/version.rs"))?;
+        let common_rs =
+            fs::read_to_string(PROJECT_ROOT.join("test/tests/fips_test_suite/common.rs"))?;
+        let toml =
+            fs::read_to_string(PROJECT_ROOT.join("builder/test_data/default_image_options.toml"))?;
+        let rom_readme = fs::read_to_string(PROJECT_ROOT.join("rom/dev/README.md"))?;
+        let fmc_readme = fs::read_to_string(PROJECT_ROOT.join("fmc/README.md"))?;
+        let fw_readme = fs::read_to_string(PROJECT_ROOT.join("runtime/README.md"))?;
+        Ok(Self {
+            version_rs,
+            common_rs,
+            toml,
+            rom_readme,
+            fmc_readme,
+            fw_readme,
+        })
+    }
 }
 
 fn verify_common(
@@ -52,7 +156,7 @@ fn verify_common(
     files: &ReleaseRelevantFiles,
     version_prefix: &str,
     version_type: &str,
-    readme_path: &str,
+    readme: &str,
 ) -> Result<()> {
     let major = tag.major;
     let minor = tag.minor;
@@ -74,10 +178,10 @@ fn verify_common(
         );
     }
 
-    if !files.readme.contains(&format!("v{}.{}", major, minor)) {
+    if !readme.contains(&format!("v{}.{}", major, minor)) {
         bail!(
-            "{} does not contain expected version v{}.{}",
-            readme_path,
+            "{} README does not contain expected version v{}.{}",
+            tag.component,
             major,
             minor
         );
@@ -85,8 +189,8 @@ fn verify_common(
     Ok(())
 }
 
-fn verify_rom(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
-    verify_common(tag, files, "ROM", "u16", "rom/dev/README.md")?;
+fn check_rom(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
+    verify_common(tag, files, "ROM", "u16", &files.rom_readme)?;
 
     let major = tag.major;
     let minor = tag.minor;
@@ -104,8 +208,8 @@ fn verify_rom(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
     Ok(())
 }
 
-fn verify_fmc(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
-    verify_common(tag, files, "FMC", "u16", "fmc/README.md")?;
+fn check_fmc(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
+    verify_common(tag, files, "FMC", "u16", &files.fmc_readme)?;
 
     let major = tag.major;
     let minor = tag.minor;
@@ -131,8 +235,8 @@ fn verify_fmc(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
     Ok(())
 }
 
-fn verify_rt(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
-    verify_common(tag, files, "RUNTIME", "u32", "runtime/README.md")?;
+fn check_fw(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
+    verify_common(tag, files, "RUNTIME", "u32", &files.fw_readme)?;
 
     let major = tag.major;
     let minor = tag.minor;
@@ -155,67 +259,8 @@ fn verify_rt(tag: &ReleaseTag, files: &ReleaseRelevantFiles) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn check(tag_str: &str) -> Result<()> {
-    let tag: ReleaseTag = tag_str.parse()?;
-
-    if extract_changelog(tag_str).is_none() {
-        bail!("No changelog entry found for tag '{}'", tag_str);
-    }
-
-    info!(
-        "Verifying version for {} to be {}.{}.{}\n",
-        tag.component, tag.major, tag.minor, tag.patch
-    );
-
-    let version_rs = fs::read_to_string("builder/src/version.rs")?;
-    let common_rs = fs::read_to_string("test/tests/fips_test_suite/common.rs")?;
-    let toml = fs::read_to_string("builder/test_data/default_image_options.toml")?;
-
-    match tag.component.as_str() {
-        "rom" => {
-            let readme = fs::read_to_string("rom/dev/README.md")?;
-            let files = ReleaseRelevantFiles {
-                version_rs,
-                common_rs,
-                toml,
-                readme,
-            };
-            verify_rom(&tag, &files)?;
-        }
-        "fmc" => {
-            let readme = fs::read_to_string("fmc/README.md")?;
-            let files = ReleaseRelevantFiles {
-                version_rs,
-                common_rs,
-                toml,
-                readme,
-            };
-            verify_fmc(&tag, &files)?;
-        }
-        "rt" => {
-            let readme = fs::read_to_string("runtime/README.md")?;
-            let files = ReleaseRelevantFiles {
-                version_rs,
-                common_rs,
-                toml,
-                readme,
-            };
-            verify_rt(&tag, &files)?;
-        }
-        _ => bail!(
-            "Unknown component '{}'. Expected 'rom', 'fmc', or 'rt'",
-            tag.component
-        ),
-    }
-
-    info!(
-        "All version checks passed for {} {}.{}.{}!\n",
-        tag.component, tag.major, tag.minor, tag.patch
-    );
-
-    crate::update_frozen_images::update_frozen_images()?;
-
-    info!("Release checks complete!");
+pub fn check_frozen_images() -> Result<()> {
+    crate::update_frozen_images::check_frozen_images()?;
     Ok(())
 }
 
@@ -229,17 +274,75 @@ struct WorkflowRun {
     conclusion: Option<String>,
 }
 
-struct ReleaseMetadata {
+struct GitHubReleaseManager {
     crab: octocrab::Octocrab,
     owner: String,
     repo: String,
     head_commit: String,
-    tag_str: String,
-    component: String,
-    version_str: String,
+    tag: ReleaseTag,
 }
 
-async fn check_nightly_workflow(meta: &ReleaseMetadata) -> Result<()> {
+impl GitHubReleaseManager {
+    fn new(tag: &ReleaseTag) -> Result<Self> {
+        let head_commit = {
+            let head_output = std::process::Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .output()?;
+            String::from_utf8_lossy(&head_output.stdout)
+                .trim()
+                .to_string()
+        };
+
+        let crab = {
+            let token = std::env::var("GH_TOKEN")
+                .or_else(|_| std::env::var("GITHUB_TOKEN"))
+                .map_err(|_| anyhow!("Missing GITHUB_TOKEN"))?;
+            let mut builder = octocrab::Octocrab::builder();
+            builder = builder.personal_token(token);
+
+            builder.build()?
+        };
+
+        let url = {
+            let output = std::process::Command::new("git")
+                .args(["remote", "get-url", "release-repo"])
+                .output()?;
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        };
+
+        let (owner, repo) = if url.contains("github.com") {
+            let path = url
+                .split("github.com")
+                .last()
+                .unwrap()
+                .trim_start_matches(&[':', '/'][..])
+                .trim_end_matches(".git");
+            let parts: Vec<&str> = path.split('/').collect();
+            if parts.len() == 2 {
+                (parts[0].to_string(), parts[1].to_string())
+            } else {
+                ("chipsalliance".to_string(), "caliptra-sw".to_string())
+            }
+        } else {
+            bail!("Unsupported forge: {url}");
+        };
+
+        Ok(GitHubReleaseManager {
+            crab,
+            owner,
+            repo,
+            head_commit,
+            tag: tag.clone(),
+        })
+    }
+}
+
+async fn check_nightly_workflow(meta: &GitHubReleaseManager) -> Result<()> {
+    info!(
+        "Checking if nightly release workflow passed for commit {}...",
+        meta.head_commit
+    );
+
     let url = format!(
         "/repos/{}/{}/actions/workflows/nightly-release.yml/runs?head_sha={}",
         meta.owner, meta.repo, meta.head_commit
@@ -264,8 +367,13 @@ async fn check_nightly_workflow(meta: &ReleaseMetadata) -> Result<()> {
     Ok(())
 }
 
-fn extract_changelog(tag: &str) -> Option<String> {
-    let content = std::fs::read_to_string("CHANGELOG.md").ok()?;
+fn check_changelog(release_name: &str) -> Result<()> {
+    let _ = extract_changelog(release_name)?;
+    Ok(())
+}
+
+fn extract_changelog(release_name: &str) -> Result<String> {
+    let content = std::fs::read_to_string(PROJECT_ROOT.join("CHANGELOG.md"))?;
     let mut in_section = false;
     let mut section = String::new();
 
@@ -274,7 +382,7 @@ fn extract_changelog(tag: &str) -> Option<String> {
             if in_section {
                 break;
             }
-            if line.contains(tag) {
+            if line.contains(release_name) {
                 in_section = true;
                 continue;
             }
@@ -286,16 +394,18 @@ fn extract_changelog(tag: &str) -> Option<String> {
 
     let trimmed = section.trim();
     if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed.to_string())
+        bail!("CHANGELOG.md is missing an entry for {release_name}!");
     }
+    Ok(trimmed.to_string())
 }
 
-async fn create_github_release(meta: &ReleaseMetadata) -> Result<()> {
-    info!("Searching for an existing GitHub release matching commit {}...", meta.head_commit);
+async fn create_github_release(meta: &GitHubReleaseManager) -> Result<()> {
+    info!(
+        "Searching for an existing GitHub release matching commit {}...",
+        meta.head_commit
+    );
 
-    // Do we need to iterate through  more than 100 releases? I doubt we
+    // Do we need to iterate through more than 100 releases? I doubt we
     // want to tag a job from that far back.
     let page = meta
         .crab
@@ -306,135 +416,49 @@ async fn create_github_release(meta: &ReleaseMetadata) -> Result<()> {
         .send()
         .await?;
 
-    let mut found_release = None;
-    for r in page.items {
-        if r.target_commitish == meta.head_commit {
-            found_release = Some(r);
-            break;
-        }
-    }
+    let found_release = page
+        .items
+        .iter()
+        .find(|r| r.target_commitish == meta.head_commit)
+        .ok_or(anyhow!(
+            "Could not find a release for {}. Did the commit pass a nightly?",
+            meta.head_commit
+        ))?;
 
-    let release_name = format!("{}-{}", meta.component.to_lowercase(), meta.version_str);
+    let release_name = meta.tag.release_name();
+    let release_body = extract_changelog(&release_name)?;
 
-    let release_body = extract_changelog(&meta.tag_str)
-        .unwrap_or_else(|| format!("Release {}", release_name));
-
-    let release = match found_release {
-        Some(r) => {
-            info!("Updating existing GitHub release (ID: {})...", r.id);
-            meta.crab
-                .repos(&meta.owner, &meta.repo)
-                .releases()
-                .update(r.id.0)
-                .tag_name(&meta.tag_str)
-                .name(&release_name)
-                .body(&release_body)
-                .draft(false)
-                .prerelease(false)
-                .send()
-                .await?
-        }
-        None => {
-            bail!("No existing release found. Does the commit have a passing nightly?");
-        }
-    };
+    info!(
+        "Updating existing GitHub release (ID: {})...",
+        found_release.id
+    );
+    let release = meta
+        .crab
+        .repos(&meta.owner, &meta.repo)
+        .releases()
+        .update(found_release.id.0)
+        .tag_name(&release_name)
+        .name(&release_name)
+        .body(&release_body)
+        .draft(false)
+        .prerelease(false)
+        .send()
+        .await?;
 
     info!("Successfully created GitHub release: {}", release.html_url);
     Ok(())
 }
 
-pub(crate) fn deploy(tag_str: &str) -> Result<()> {
+pub fn check(tag_str: &str) -> Result<()> {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    rt.block_on(release_checklist(tag_str))
+}
+
+pub fn deploy(tag_str: &str) -> Result<()> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
     rt.block_on(deploy_async(tag_str))
-}
-
-async fn deploy_async(tag_str: &str) -> Result<()> {
-    let tag: ReleaseTag = tag_str.parse()?;
-
-    let head_output = std::process::Command::new("git")
-        .args(["rev-parse", "HEAD"])
-        .output()?;
-    let head_commit = String::from_utf8_lossy(&head_output.stdout)
-        .trim()
-        .to_string();
-
-    info!(
-        "Checking if nightly release workflow passed for commit {}...",
-        head_commit
-    );
-
-    let token = std::env::var("GH_TOKEN")
-        .or_else(|_| std::env::var("GITHUB_TOKEN"))
-        .map_err(|_| anyhow!("Missing GITHUB_TOKEN"))?;
-    let mut builder = octocrab::Octocrab::builder();
-    if !token.is_empty() {
-        builder = builder.personal_token(token);
-    }
-    let crab = builder.build()?;
-
-    let output = std::process::Command::new("git")
-        .args(["remote", "get-url", "release-repo"])
-        .output()?;
-    let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
-
-    let (owner, repo) = if url.contains("github.com") {
-        let path = url
-            .split("github.com")
-            .last()
-            .unwrap()
-            .trim_start_matches(&[':', '/'][..])
-            .trim_end_matches(".git");
-        let parts: Vec<&str> = path.split('/').collect();
-        if parts.len() == 2 {
-            (parts[0].to_string(), parts[1].to_string())
-        } else {
-            ("chipsalliance".to_string(), "caliptra-sw".to_string())
-        }
-    } else {
-        ("chipsalliance".to_string(), "caliptra-sw".to_string())
-    };
-
-    let version_str = format!("{}.{}.{}", tag.major, tag.minor, tag.patch);
-
-    let meta = ReleaseMetadata {
-        crab,
-        owner,
-        repo,
-        head_commit,
-        tag_str: tag_str.to_string(),
-        component: tag.component.clone(),
-        version_str,
-    };
-
-    check_nightly_workflow(&meta).await?;
-
-    info!("Nightly workflow passed! Proceeding with deployment.");
-
-    check(tag_str)?;
-
-    info!("Creating git tag: {}", tag_str);
-    let tag_status = std::process::Command::new("git")
-        .args(["tag", tag_str])
-        .status()?;
-
-    if !tag_status.success() {
-        bail!("Failed to create git tag '{}'", tag_str);
-    }
-
-    info!("Pushing git tag to release-repo: {}", tag_str);
-    let push_status = std::process::Command::new("git")
-        .args(["push", "release-repo", tag_str])
-        .status()?;
-
-    if !push_status.success() {
-        bail!("Failed to push git tag '{}' to release-repo", tag_str);
-    }
-
-    info!("Successfully deployed tag {}", tag_str);
-
-    create_github_release(&meta).await?;
-
-    Ok(())
 }
