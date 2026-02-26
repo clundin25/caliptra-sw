@@ -11,6 +11,7 @@ use std::{
 mod clippy;
 mod precheckin;
 mod release;
+mod update_frozen_images;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -30,6 +31,8 @@ enum Commands {
         #[command(subcommand)]
         command: ReleaseCommands,
     },
+    /// Build ROM images and update the FROZEN_IMAGES.sha384sum file
+    UpdateFrozenImages,
 }
 
 #[derive(Subcommand)]
@@ -72,6 +75,7 @@ fn main() {
             ReleaseCommands::Check { tag } => release::check(tag),
             ReleaseCommands::Deploy { tag } => release::deploy(tag),
         },
+        Commands::UpdateFrozenImages => update_frozen_images::update_frozen_images(),
     };
     result.unwrap_or_else(|e| {
         log::error!("Error: {}", e);
