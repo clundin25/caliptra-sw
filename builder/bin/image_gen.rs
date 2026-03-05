@@ -55,13 +55,13 @@ fn main() {
     let mut valid_cmd = false;
 
     if let Some(path) = args.get_one::<PathBuf>("rom-no-log") {
-        let rom = caliptra_builder::build_firmware_rom(&firmware::ROM).unwrap();
+        let rom = caliptra_builder::build_firmware_rom(&firmware::ROM_FPGA).unwrap();
         valid_cmd = true;
         std::fs::write(path, rom).unwrap();
     }
 
     if let Some(path) = args.get_one::<PathBuf>("rom-with-log") {
-        let rom = caliptra_builder::build_firmware_rom(&firmware::ROM_WITH_UART).unwrap();
+        let rom = caliptra_builder::build_firmware_rom(&firmware::ROM_FPGA_WITH_UART).unwrap();
         valid_cmd = true;
         std::fs::write(path, rom).unwrap();
     }
