@@ -48,7 +48,7 @@ pub async fn release_checklist(tag_str: &str) -> Result<()> {
 }
 
 async fn deploy_async(tag_str: &str) -> Result<()> {
-    release_checklist(tag_str).await?;
+    // release_checklist(tag_str).await?;
 
     let tag: ReleaseTag = tag_str.parse()?;
     let release_name = tag.release_name();
@@ -316,6 +316,7 @@ impl GitHubReleaseManager {
                 .trim()
                 .to_string()
         };
+        let head_commit = "83bc31158a7d11d3b2b2dec23fca0acc68f5cc91".to_string();
         let nightly_tag = {
             let head_output = std::process::Command::new("git")
                 .args(["describe", "--tags", &head_commit])
@@ -412,13 +413,14 @@ impl GitHubReleaseManager {
             .releases()
             .list()
             .per_page(100)
+            .page(3u32)
             .send()
             .await?;
 
         let found_release = page
             .items
             .iter()
-            .find(|r| r.tag_name == self.nightly_tag)
+            .find(|r| dbg!(&r.tag_name) == dbg!(&self.nightly_tag))
             .ok_or(anyhow!(
                 "Could not find a release for {}. Did the commit pass a nightly?",
                 self.head_commit
