@@ -109,7 +109,7 @@ impl<'a> CborEncoder<'a> {
     }
 
     // Encode major type + additional info according to CBOR rules
-    fn encode_type_value(&mut self, major_type: MajorType, value: u64) -> Result<(), EatError> {
+    pub fn encode_type_value(&mut self, major_type: MajorType, value: u64) -> Result<(), EatError> {
         let major: u8 = major_type.into();
         let major = major << 5;
 

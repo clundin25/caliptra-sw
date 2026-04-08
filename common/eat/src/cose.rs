@@ -230,6 +230,11 @@ impl<'a, const PROTECTED_SIZE: usize> CoseSign1WithBuffer<'a, PROTECTED_SIZE> {
         Ok(protected_buffer)
     }
 
+    /// Get the encoded protected header
+    pub fn get_protected_header_encoded(&self) -> Result<ArrayVec<u8, PROTECTED_SIZE>, EatError> {
+        self.encode_protected_header_to_buffer()
+    }
+
     /// Set the protected header
     pub fn protected_header(mut self, header: &'a ProtectedHeader) -> Self {
         self.protected_header = Some(header);

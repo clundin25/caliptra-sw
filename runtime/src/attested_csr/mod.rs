@@ -2,7 +2,8 @@
 
 use crate::Drivers;
 use caliptra_common::x509;
-use caliptra_drivers::{KeyReadArgs, Mldsa87Seed, Mldsa87SignRnd};
+use caliptra_drivers::sha2_512_384::Sha2DigestOpTrait;
+use caliptra_drivers::{Array4x12, KeyReadArgs, Mldsa87Seed, Mldsa87SignRnd};
 use caliptra_error::{CaliptraError, CaliptraResult};
 use caliptra_ocp_eat::csr_eat::{oids, CsrEatClaims};
 use caliptra_ocp_eat::{cbor::TaggedOid, cbor_tags, CborEncoder, CoseSign1, ProtectedHeader};
@@ -23,30 +24,11 @@ use rt_alias::{generate_rt_alias_ecc_csr, generate_rt_alias_mldsa_csr};
 // - Attributes claim (1 OID, 11 bytes): 5 (key -70002) + 1 (array header) + 2 (tag 111) + 1 (bstr header) + 11 (OID) = 20 bytes
 // Total: 7744 bytes, rounded up to 8KB for safety
 pub(crate) const MAX_CSR_EAT_CLAIMS_SIZE: usize = 8192;
-
-// Maximum size for COSE Sign1 signature context (Sig_structure)
-// Calculation (worst case with ML-DSA-87, kid = 20 bytes):
-// - Array header (4 items): 1 byte
-// - Context string "Signature1": 1 (text header) + 10 (chars) = 11 bytes
-// - Protected header (byte string): 2 (bstr header) + 30 (serialized map) = 32 bytes
-//     Map header (3 entries): 1 byte
-//     Algorithm (key 1: 1 byte + alg -51/-50: 2 bytes): 3 bytes
-//     Content-type (key 3: 1 byte + uint 263: 3 bytes): 4 bytes
-//     Key ID (key 4: 1 byte + bstr 20: 1 + 20 bytes): 22 bytes
-// - External AAD (empty bstr): 1 byte
-// - Payload (CSR EAT claims, up to 7744 bytes): 3 (bstr header) + 7744 (data) = 7747 bytes
-// Total: 7792 bytes, rounded up to 8KB for safety
-pub(crate) const MAX_SIGN_CONTEXT_SIZE: usize = 8192;
 pub(crate) const MAX_CSR_SIZE: usize = 8192;
 
 enum CryptoType {
     ECC384,
     MLDSA87,
-}
-
-pub(crate) struct CsrData {
-    pub data: [u8; MAX_CSR_SIZE],
-    pub len: usize,
 }
 
 pub(crate) enum DevIdKeyType {
@@ -79,34 +61,24 @@ impl DevIdKeyType {
         }
     }
 
-    pub fn generate_ecc_csr(&self, drivers: &mut Drivers) -> CaliptraResult<CsrData> {
-        let mut csr_data = [0u8; MAX_CSR_SIZE];
-
-        let csr_len: usize = match self {
-            DevIdKeyType::LdevId => generate_ldevid_ecc_csr(drivers, &mut csr_data),
-            DevIdKeyType::FmcAlias => generate_fmc_alias_ecc_csr(drivers, &mut csr_data),
-            DevIdKeyType::RtAlias => generate_rt_alias_ecc_csr(drivers, &mut csr_data),
-        }?;
-
-        Ok(CsrData {
-            data: csr_data,
-            len: csr_len,
-        })
+    pub fn generate_ecc_csr(&self, drivers: &mut Drivers, csr_data: &mut [u8]) -> CaliptraResult<usize> {
+        let csr_data = <&mut [u8; MAX_CSR_SIZE]>::try_from(csr_data)
+            .map_err(|_| CaliptraError::RUNTIME_MAILBOX_INVALID_PARAMS)?;
+        match self {
+            DevIdKeyType::LdevId => generate_ldevid_ecc_csr(drivers, csr_data),
+            DevIdKeyType::FmcAlias => generate_fmc_alias_ecc_csr(drivers, csr_data),
+            DevIdKeyType::RtAlias => generate_rt_alias_ecc_csr(drivers, csr_data),
+        }
     }
 
-    pub fn generate_mldsa_csr(&self, drivers: &mut Drivers) -> CaliptraResult<CsrData> {
-        let mut csr_data = [0u8; MAX_CSR_SIZE];
-
-        let csr_len: usize = match self {
-            DevIdKeyType::LdevId => generate_ldevid_mldsa_csr(drivers, &mut csr_data),
-            DevIdKeyType::FmcAlias => generate_fmc_alias_mldsa_csr(drivers, &mut csr_data),
-            DevIdKeyType::RtAlias => generate_rt_alias_mldsa_csr(drivers, &mut csr_data),
-        }?;
-
-        Ok(CsrData {
-            data: csr_data,
-            len: csr_len,
-        })
+    pub fn generate_mldsa_csr(&self, drivers: &mut Drivers, csr_data: &mut [u8]) -> CaliptraResult<usize> {
+        let csr_data = <&mut [u8; MAX_CSR_SIZE]>::try_from(csr_data)
+            .map_err(|_| CaliptraError::RUNTIME_MAILBOX_INVALID_PARAMS)?;
+        match self {
+            DevIdKeyType::LdevId => generate_ldevid_mldsa_csr(drivers, csr_data),
+            DevIdKeyType::FmcAlias => generate_fmc_alias_mldsa_csr(drivers, csr_data),
+            DevIdKeyType::RtAlias => generate_rt_alias_mldsa_csr(drivers, csr_data),
+        }
     }
 
     fn generate_csr_eat_claims(
@@ -118,15 +90,15 @@ impl DevIdKeyType {
     ) -> CaliptraResult<usize> {
         let attributes = [self.to_kda_oid()];
         // generate CSR for key identified by key_id
-        let csr_data = match crypto {
-            CryptoType::ECC384 => self.generate_ecc_csr(drivers),
-            CryptoType::MLDSA87 => self.generate_mldsa_csr(drivers),
+        let mut csr_data = [0u8; MAX_CSR_SIZE];
+        let csr_len = match crypto {
+            CryptoType::ECC384 => self.generate_ecc_csr(drivers, &mut csr_data),
+            CryptoType::MLDSA87 => self.generate_mldsa_csr(drivers, &mut csr_data),
         }?;
 
         let attested_csr = CsrEatClaims::with_nonce(
             csr_data
-                .data
-                .get(..csr_data.len)
+                .get(..csr_len)
                 .ok_or(CaliptraError::RUNTIME_ATTESTED_CSR_EAT_ENCODING_ERROR)?,
             &attributes,
             nonce,
@@ -138,6 +110,65 @@ impl DevIdKeyType {
             .map_err(|_| CaliptraError::RUNTIME_ATTESTED_CSR_EAT_ENCODING_ERROR)?;
 
         Ok(cbor_eat_encoder.len())
+    }
+
+    fn hash_signature_context(
+        drivers: &mut Drivers,
+        cose_sign1: &CoseSign1,
+        payload: &[u8],
+    ) -> CaliptraResult<Array4x12> {
+        let mut sha_op = drivers.sha2_512_384.sha384_digest_init()?;
+
+        // Sig_structure = [ "Signature1", body_protected, external_aad, payload ]
+        // All are CBOR encoded.
+        
+        // Use a small buffer for headers
+        let mut header_buf = [0u8; 64];
+        
+        // 1. Array header (4 items)
+        let len = {
+            let mut encoder = CborEncoder::new(&mut header_buf);
+            encoder.encode_array_header(4).map_err(|_| CaliptraError::RUNTIME_ATTESTED_CSR_COSE_SIGN1_ENCODING_ERROR)?;
+            encoder.len()
+        };
+        sha_op.update(&header_buf[..len])?;
+
+        // 2. "Signature1"
+        let len = {
+            let mut encoder = CborEncoder::new(&mut header_buf);
+            encoder.encode_text("Signature1").map_err(|_| CaliptraError::RUNTIME_ATTESTED_CSR_COSE_SIGN1_ENCODING_ERROR)?;
+            encoder.len()
+        };
+        sha_op.update(&header_buf[..len])?;
+
+        // 3. body_protected (byte string)
+        let protected_header_encoded = cose_sign1.get_protected_header_encoded()
+            .map_err(|_| CaliptraError::RUNTIME_ATTESTED_CSR_COSE_SIGN1_ENCODING_ERROR)?;
+        let len = {
+            let mut encoder = CborEncoder::new(&mut header_buf);
+            encoder.encode_type_value(caliptra_ocp_eat::cbor::MajorType::ByteString, protected_header_encoded.len() as u64)
+                .map_err(|_| CaliptraError::RUNTIME_ATTESTED_CSR_COSE_SIGN1_ENCODING_ERROR)?;
+            encoder.len()
+        };
+        sha_op.update(&header_buf[..len])?;
+        sha_op.update(&protected_header_encoded)?;
+
+        // 4. external_aad (empty byte string)
+        sha_op.update(&[0x40])?; // CBOR empty bstr
+
+        // 5. payload (byte string)
+        let len = {
+            let mut encoder = CborEncoder::new(&mut header_buf);
+            encoder.encode_type_value(caliptra_ocp_eat::cbor::MajorType::ByteString, payload.len() as u64)
+                .map_err(|_| CaliptraError::RUNTIME_ATTESTED_CSR_COSE_SIGN1_ENCODING_ERROR)?;
+            encoder.len()
+        };
+        sha_op.update(&header_buf[..len])?;
+        sha_op.update(payload)?;
+
+        let mut digest = Array4x12::default();
+        sha_op.finalize(&mut digest)?;
+        Ok(digest)
     }
 
     pub fn generate_attested_ecc_csr(
@@ -158,17 +189,7 @@ impl DevIdKeyType {
             .protected_header(&protected_header)
             .payload(payload);
 
-        let mut signature_ctx_buffer = [0u8; MAX_SIGN_CONTEXT_SIZE];
-        let sign_ctx_len = cose_sign1
-            .get_signature_context(&mut signature_ctx_buffer)
-            .map_err(|_| CaliptraError::RUNTIME_ATTESTED_CSR_COSE_SIGN1_ENCODING_ERROR)?;
-
-        // Hash the signature context using SHA384
-        let signature_slice = &signature_ctx_buffer
-            .get(..sign_ctx_len)
-            .ok_or(CaliptraError::RUNTIME_ATTESTED_CSR_COSE_SIGN1_ENCODING_ERROR)?;
-        let digest = drivers.sha2_512_384.sha384_digest(signature_slice);
-        let digest = caliptra_drivers::okref(&digest)?;
+        let digest = Self::hash_signature_context(drivers, &cose_sign1, payload)?;
 
         // Get RT Alias private key from key vault
         let key_id_rt_priv_key = Drivers::get_key_id_rt_ecc_priv_key(drivers)?;
@@ -178,7 +199,7 @@ impl DevIdKeyType {
         let priv_key = caliptra_drivers::Ecc384PrivKeyIn::Key(priv_key_args);
         let signature = drivers
             .ecc384
-            .sign(priv_key, &rt_pub_key, digest, &mut drivers.trng)?;
+            .sign(priv_key, &rt_pub_key, &digest, &mut drivers.trng)?;
 
         // Convert signature to [u8; 96] format (r || s)
         let mut ecc384_signature = [0u8; 96];
@@ -214,17 +235,7 @@ impl DevIdKeyType {
             .protected_header(&protected_header)
             .payload(payload);
 
-        let mut signature_ctx_buffer = [0u8; MAX_SIGN_CONTEXT_SIZE];
-        let sign_ctx_len = cose_sign1
-            .get_signature_context(&mut signature_ctx_buffer)
-            .map_err(|_| CaliptraError::RUNTIME_ATTESTED_CSR_COSE_SIGN1_ENCODING_ERROR)?;
-
-        // Hash the signature context using SHA384
-        let signature_slice = &signature_ctx_buffer
-            .get(..sign_ctx_len)
-            .ok_or(CaliptraError::RUNTIME_ATTESTED_CSR_COSE_SIGN1_ENCODING_ERROR)?;
-        let digest = drivers.sha2_512_384.sha384_digest(signature_slice);
-        let digest = caliptra_drivers::okref(&digest)?;
+        let digest = Self::hash_signature_context(drivers, &cose_sign1, payload)?;
 
         let rt_seed = Drivers::get_key_id_rt_mldsa_keypair_seed(drivers)?;
         let key_args = KeyReadArgs::new(rt_seed);
