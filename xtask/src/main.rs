@@ -99,6 +99,25 @@ pub enum CICommands {
         path: String,
     },
     TestMatrix,
+    /// Build all targets
+    Build,
+    /// Run tests
+    Test {
+        #[command(subcommand)]
+        command: TestCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum TestCommands {
+    /// Run unit tests
+    Unit,
+    /// Run compliance tests
+    Compliance,
+    /// Run ROM tests
+    Rom,
+    /// Run integration tests
+    Integration,
 }
 
 pub static PROJECT_ROOT: LazyLock<PathBuf> = LazyLock::new(|| {
@@ -144,6 +163,13 @@ fn main() {
             CICommands::SizeHistory => ci::size_history(),
             CICommands::BitstreamDownloader { path } => ci::bitstream_download(path.clone()),
             CICommands::TestMatrix => Ok(()),
+            CICommands::Build => ci::build(),
+            CICommands::Test { command } => match command {
+                TestCommands::Unit => ci::test_unit(),
+                TestCommands::Compliance => ci::test_compliance(),
+                TestCommands::Rom => ci::test_rom(),
+                TestCommands::Integration => ci::test_integration(),
+            },
         },
     };
     result.unwrap_or_else(|e| {

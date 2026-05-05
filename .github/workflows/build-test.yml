@@ -51,40 +51,7 @@ jobs:
           echo "Build-Test: release_ref=$(git rev-parse HEAD)"
 
       - name: Build
-        run: |
-          cargo --config "$EXTRA_CARGO_CONFIG" build --locked
-          drivers/test-fw/build.sh
-          (cd fmc && ./build.sh)
-          (cd runtime && ./build.sh)
-          (cd rom/dev && ./build.sh)
-
-      - name: Build with OpenSSL
-        run: |
-          for proj in caliptra-auth-manifest-app caliptra-builder caliptra-image-crypto caliptra-image-app; do
-            cargo build -p $proj --locked --no-default-features --features openssl
-          done
-
-      - name: Build with RustCrypto
-        run: |
-          for proj in caliptra-auth-manifest-app caliptra-builder caliptra-image-crypto caliptra-image-app; do
-            cargo build -p $proj --locked --no-default-features --features rustcrypto
-          done
-
-      - name: Build hw-model with fpga_realtime, fpga_subsystem, itrng, coverage
-        run: |
-          for feature in fpga_realtime fpga_subsystem itrng coverage; do
-            echo "Building with $feature"
-            cargo build --locked --features $feature
-          done
-
-      - name: Check x509 templates are up to date
-        run: |
-          cargo run -p caliptra-x509-gen --locked
-          git diff --exit-code -- x509/build/ x509/src/ || (
-            echo "x509 templates are out of date. Please regenerate with:"
-            echo "  cargo run -p caliptra-x509-gen"
-            exit 1
-          )
+        run: cargo xtask ci build
 
       # As fuzzing targets are not part of the workspace, perform their tests explicitly.
       - name: Build test fuzzing targets
@@ -117,10 +84,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Run tests
-        run: |
-          CPTRA_COVERAGE_PATH=/tmp cargo --config "$EXTRA_CARGO_CONFIG" test --locked
-          CPTRA_COVERAGE_PATH=/tmp cargo --config "$EXTRA_CARGO_CONFIG" run --manifest-path ./coverage/Cargo.toml
-          CPTRA_COVERAGE_PATH=/tmp cargo --config "$EXTRA_CARGO_CONFIG" test -p caliptra-runtime --features ocp-lock test_ocp_lock --locked
+        run: cargo xtask ci test unit
 
   test_compliance:
     needs: lint
@@ -132,8 +96,7 @@ jobs:
       - name: Run emulator conformance tests
         run: |
           sudo apt-get update -qy && sudo apt-get install gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf
-          (cd /tmp/ && git clone --depth 1 --branch old-framework-2.x https://github.com/riscv-non-isa/riscv-arch-test)
-          cargo --config "$EXTRA_CARGO_CONFIG" run --locked -p compliance-test -- --test_root_path /tmp/riscv-arch-test
+          cargo xtask ci test compliance
 
   test_rom:
     needs: lint
@@ -142,21 +105,8 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v5
 
-      - name: Build ROM artifacts
-        run: |
-          drivers/test-fw/build.sh
-          (cd fmc && ./build.sh)
-          (cd runtime && ./build.sh)
-          (cd rom/dev && ./build.sh)
-
-      - name: ROM Makefile
-        run: |
-          (cd rom/dev && DEVICE_LIFECYCLE=unprovisioned make run)
-          (cd rom/dev && DEVICE_LIFECYCLE=manufacturing make run)
-          (cd rom/dev && DEVICE_LIFECYCLE=production make run)
-          (cd rom/dev && DEVICE_LIFECYCLE=unprovisioned make run-active)
-          (cd rom/dev && DEVICE_LIFECYCLE=manufacturing make run-active)
-          (cd rom/dev && DEVICE_LIFECYCLE=production make run-active)
+      - name: Run ROM tests
+        run: cargo xtask ci test rom
 
   test_integration:
     needs: lint
@@ -171,17 +121,8 @@ jobs:
         run: |
           sudo apt-get update -qy && sudo apt-get install golang-1.21-go
 
-      - name: Caliptra HW-Model C Binding Smoke Test
-        run: |
-          (cd hw-model/c-binding/examples && make run)
-
-      - name: Caliptra C API Hwmodel Integration Test
-        run: |
-          (cd libcaliptra/examples/hwmodel && make && ./hwmodel)
-
-      - name: DPE Verification Tests
-        run: |
-          (cd test/dpe_verification && make run)
+      - name: Run integration tests
+        run: cargo xtask ci test integration
 
   all_checks_passed:
     needs: [build, test_unit, test_compliance, test_rom, test_integration]
