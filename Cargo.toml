@@ -16,6 +16,7 @@ exclude = [
 
   # Don't pull unnecessary tools into the workspace
   "ci-tools/test-printer",
+  "caliptra-dpe",
 ]
 
 members = [
@@ -109,9 +110,9 @@ caliptra-drivers = { path = "drivers" }
 caliptra-drivers-test-bin = { path = "drivers/test-fw" }
 
 # DPE dependencies; keep git revs in sync alongside test/dpe_verification/go.mod
-caliptra-dpe = { git = "https://github.com/chipsalliance/caliptra-dpe", rev = "3e5b97094e71a5d5c6f6a5bd1882f4006830f2cc", default-features = false, features = ["hybrid"] }
-caliptra-dpe-crypto = { git = "https://github.com/chipsalliance/caliptra-dpe", rev = "3e5b97094e71a5d5c6f6a5bd1882f4006830f2cc", default-features = false }
-caliptra-dpe-platform = { git = "https://github.com/chipsalliance/caliptra-dpe", rev = "3e5b97094e71a5d5c6f6a5bd1882f4006830f2cc", default-features = false }
+caliptra-dpe = { path = "caliptra-dpe/dpe", default-features = false, features = ["hybrid"] }
+caliptra-dpe-crypto = { path = "caliptra-dpe/crypto", default-features = false }
+caliptra-dpe-platform = { path = "caliptra-dpe/platform", default-features = false }
 
 caliptra-emu-bus = { path = "sw-emulator/lib/bus" }
 caliptra-emu-cpu = { path = "sw-emulator/lib/cpu" }

@@ -331,7 +331,12 @@ pub fn execute_dpe_cmd<T: HwModel>(hw: &mut T, dpe_cmd: &mut Command) -> Respons
     .unwrap();
 
     let resp_bytes = &resp.data[..resp.data_size as usize];
-    Response::try_read_from_bytes(dpe_cmd, resp_bytes).unwrap()
+    let parsed_resp = Response::try_read_from_bytes(dpe_cmd, resp_bytes);
+    if let Err(e) = &parsed_resp {
+        println!("try_read_from_bytes failed with {:?}", e);
+        println!("resp_bytes (len={}): {:x?}", resp_bytes.len(), resp_bytes);
+    }
+    parsed_resp.unwrap()
 }
 
 pub fn fips_fw_image() -> Vec<u8> {
