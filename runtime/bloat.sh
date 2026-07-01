@@ -9,13 +9,14 @@ if [ -z $1 ]; then
     echo "Where [revision] has to be one of the revisions under /hw (rev-latest, rev-2_1, ...)."
     exit 1
 fi
+export CALIPTRA_HW_REV=$1
 
 cargo bloat \
   --locked \
   --target riscv32imc-unknown-none-elf \
   --profile=firmware \
   --no-default-features \
-  --features=emu,fips_self_test,riscv,$1 \
+  --features=emu,fips_self_test,riscv \
   -p caliptra-runtime \
   -n 200 \
   --bin=caliptra-runtime

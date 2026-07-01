@@ -321,6 +321,10 @@ impl Container {
             .volume(&format!("{home}/.cargo/registry"), "/root/.cargo/registry")
             .volume(&format!("{home}/.cargo/git"), "/root/.cargo/git");
 
+        if let Ok(val) = std::env::var("CALIPTRA_HW_REV") {
+            self.env("CALIPTRA_HW_REV", &val);
+        }
+
         self.arg(BUILDER_IMAGE).arg("/bin/bash").arg("-c");
         Ok(self)
     }
