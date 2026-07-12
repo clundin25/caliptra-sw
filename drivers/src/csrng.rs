@@ -102,31 +102,28 @@ impl Csrng {
         seed: Seed,
         persistent_data: PersistentDataAccessor,
     ) -> CaliptraResult<Self> {
-        const FALSE: u32 = MultiBitBool::False as u32;
-        const TRUE: u32 = MultiBitBool::True as u32;
-
         let mut result = Self { csrng, entropy_src };
         let e = result.entropy_src.regs_mut();
 
         // Configure and enable entropy_src if not already enabled.
         // If already enabled, assume it was configured correctly by a previous call.
-        if e.module_enable().read().module_enable() == FALSE {
+        if e.module_enable().read().module_enable() == MULTIBIT_FALSE {
             // Configure entropy_src
             let entropy_cfg = read_entropy_configuration(&soc_ifc.regs(), persistent_data);
             set_health_check_thresholds(e, entropy_cfg.entropy_cfg.clone());
 
             let rng_bit_enable = if entropy_cfg.entropy_cfg_extension.rng_bit_enable() {
-                TRUE
+                MULTIBIT_TRUE
             } else {
-                FALSE
+                MULTIBIT_FALSE
             };
 
             e.conf().write(|w| {
-                w.fips_enable(TRUE)
-                    .entropy_data_reg_enable(FALSE)
+                w.fips_enable(MULTIBIT_TRUE)
+                    .entropy_data_reg_enable(MULTIBIT_FALSE)
                     // THRESHOLD_SCOPE=FALSE so adaptive-proportion and Markov health
                     // tests score each of the 4 RNG bus lanes individually.
-                    .threshold_scope(FALSE)
+                    .threshold_scope(MULTIBIT_FALSE)
                     .rng_bit_enable(rng_bit_enable)
                     .rng_bit_sel(entropy_cfg.entropy_cfg_extension.rng_bit_sel())
             });
@@ -138,9 +135,9 @@ impl Csrng {
                 & 1
                 == 1
             {
-                e.entropy_control().modify(|w| w.es_type(TRUE));
+                e.entropy_control().modify(|w| w.es_type(MULTIBIT_TRUE));
             }
-            e.module_enable().write(|w| w.module_enable(TRUE));
+            e.module_enable().write(|w| w.module_enable(MULTIBIT_TRUE));
             check_for_alert_state(result.entropy_src.regs())?;
 
             // Lock entropy_src configuration if not in debug mode.
@@ -153,12 +150,11 @@ impl Csrng {
                 e.sw_regupd().modify(|w| w.sw_regupd(false));
             }
         }
-
         let c = result.csrng.regs_mut();
 
-        if c.ctrl().read().enable() == FALSE {
+        if c.ctrl().read().enable() == MULTIBIT_FALSE {
             c.ctrl()
-                .write(|w| w.enable(TRUE).sw_app_enable(TRUE).read_int_state(TRUE));
+                .write(|w| w.enable(MULTIBIT_TRUE).sw_app_enable(MULTIBIT_TRUE).read_int_state(MULTIBIT_TRUE));
         }
 
         send_command(&mut result.csrng, Command::Uninstantiate)?;
@@ -185,7 +181,7 @@ impl Csrng {
     /// }
     /// ```
     pub fn generate12(&mut self) -> CaliptraResult<[u32; 12]> {
-        check_for_alert_state(self.entropy_src.regs())?;
+        self.manage_entropy_src_and_reseed()?;
 
         send_command(
             &mut self.csrng,
@@ -222,6 +218,57 @@ impl Csrng {
         }
     }
 
+    /// Number of Generate calls before the reseed interval at which entropy_src
+    /// is pre-enabled, so it is ready by the time the reseed is needed.
+    /// Covers the ~2 ms entropy_src startup at typical generate cadence.
+    pub const ENTROPY_SRC_PRE_ENABLE_HEADROOM: u32 = 5;
+
+    /// Disable entropy_src.
+    ///
+    /// Must be called only after any in-flight Reseed has consumed its seed
+    /// from the esfinal FIFO; disabling mid-Reseed clears that FIFO and hangs
+    /// the CSRNG in `MainSmReseedPrep`. Pair with `wait_for_csrng_idle`.
+    pub(crate) fn disable_entropy_source(&mut self) {
+        self.entropy_src
+            .regs_mut()
+            .module_enable()
+            .write(|w| w.module_enable(MULTIBIT_FALSE));
+    }
+
+    pub(crate) fn enable_entropy_source(&mut self) {
+        self.entropy_src
+            .regs_mut()
+            .module_enable()
+            .write(|w| w.module_enable(MULTIBIT_TRUE));
+    }
+
+    /// Called before every Generate command. Keeps entropy_src disabled except
+    /// during a short window around each reseed:
+    ///
+    /// Phase 1 — pre-enable (`counter >= interval - HEADROOM`): enable
+    /// entropy_src in the background so its startup health checks overlap with
+    /// the next few Generates.
+    ///
+    /// Phase 2 — reseed (`counter >= interval`): reseed from entropy_src,
+    /// then disable it again. The Generate runs with entropy_src off.
+    fn manage_entropy_src_and_reseed(&mut self) -> CaliptraResult<()> {
+        let interval = self.csrng.regs().reseed_interval().read();
+        let counter = self.csrng.regs().reseed_counter_2().read();
+        if counter >= interval {
+            self.ensure_entropy_src_enabled(&Seed::EntropySrc)?;
+            self.reseed(Seed::EntropySrc)?;
+            self.disable_entropy_source();
+            return Ok(());
+        }
+
+        let pre_enable_threshold = interval.saturating_sub(Self::ENTROPY_SRC_PRE_ENABLE_HEADROOM);
+        if counter >= pre_enable_threshold {
+            self.enable_entropy_source();
+        }
+
+        Ok(())
+    }
+
     /// Return 16 randomly generated [`u32`]s (512 bits = four 128-bit GENBITS
     /// blocks) from a single Generate command.
     ///
@@ -235,7 +282,7 @@ impl Csrng {
     ///
     /// Returns an error if the internal generate command fails.
     pub fn generate16(&mut self) -> CaliptraResult<[u32; 16]> {
-        check_for_alert_state(self.entropy_src.regs())?;
+        self.manage_entropy_src_and_reseed()?;
 
         send_command(
             &mut self.csrng,
@@ -261,8 +308,23 @@ impl Csrng {
         Ok(result)
     }
 
+    /// Reseed the DRBG with the given seed. Returns only after the CSRNG has
+    /// fully processed the Reseed — `send_command` alone returns when the
+    /// command is accepted into the staging FIFO, not when the seed has been
+    /// consumed. Callers that disable entropy_src after this call need that
+    /// stronger guarantee.
     pub fn reseed(&mut self, seed: Seed) -> CaliptraResult<()> {
-        send_command(&mut self.csrng, Command::Reseed(seed))
+        self.ensure_entropy_src_enabled(&seed)?;
+        // FIPS test hook: inject a reseed failure for testing on platforms
+        // where the real TRNG cannot produce bad entropy (e.g. FPGA itrng).
+        // No-op unless `fips-test-hooks` is enabled and the host arms
+        // `CSRNG_RESEED_FAILURE` in `cptra_dbg_manuf_service_reg`.
+        #[cfg(feature = "fips-test-hooks")]
+        unsafe {
+            crate::FipsTestHook::error_if_hook_set(crate::FipsTestHook::CSRNG_RESEED_FAILURE)?;
+        }
+        send_command(&mut self.csrng, Command::Reseed(seed))?;
+        self.wait_for_csrng_idle()
     }
 
     /// Tear down the current DRBG instance and create a new one with the
@@ -280,8 +342,29 @@ impl Csrng {
     /// Returns an error if either the internal `Uninstantiate` or
     /// `Instantiate` command fails.
     pub fn reinstantiate(&mut self, seed: Seed) -> CaliptraResult<()> {
+        self.ensure_entropy_src_enabled(&seed)?;
         send_command(&mut self.csrng, Command::Uninstantiate)?;
         send_command(&mut self.csrng, Command::Instantiate(seed))
+    }
+
+    /// Enables entropy_src and waits for it to be ready if the seed source is
+    /// `EntropySrc` and the module is currently disabled. No-op for
+    /// `Seed::Constant` since entropy_src is not needed in that case.
+    fn ensure_entropy_src_enabled(&mut self, seed: &Seed) -> CaliptraResult<()> {
+        if matches!(seed, Seed::EntropySrc) {
+            if self
+                .entropy_src
+                .regs()
+                .module_enable()
+                .read()
+                .module_enable()
+                != MULTIBIT_TRUE
+            {
+                self.enable_entropy_source();
+            }
+            check_for_alert_state(self.entropy_src.regs())?;
+        }
+        Ok(())
     }
 
     pub fn update(&mut self, additional_data: &[u32]) -> CaliptraResult<()> {
@@ -308,6 +391,19 @@ impl Csrng {
 
     pub fn zeroize(&mut self) -> CaliptraResult<()> {
         send_command(&mut self.csrng, Command::Uninstantiate)
+    }
+
+    /// Wait for the CSRNG main SM to return to Idle. `send_command` returns
+    /// when the command is accepted into the staging FIFO, not when the CSRNG
+    /// finishes executing it.
+    fn wait_for_csrng_idle(&self) -> CaliptraResult<()> {
+        const MAIN_SM_IDLE: u32 = 0x4e;
+        loop {
+            let state = self.csrng.regs().main_sm_state().read().main_sm_state();
+            if state == MAIN_SM_IDLE {
+                return Ok(());
+            }
+        }
     }
 }
 
@@ -370,6 +466,9 @@ enum MultiBitBool {
     False = 9,
     True = 6,
 }
+
+const MULTIBIT_FALSE: u32 = MultiBitBool::False as u32;
+const MULTIBIT_TRUE: u32 = MultiBitBool::True as u32;
 
 /// Contains counts of failing health checks.
 ///
