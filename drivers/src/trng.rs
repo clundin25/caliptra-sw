@@ -165,9 +165,11 @@ impl Trng {
         }
     }
 
-    pub fn disable_entropy_source(&mut self) {
+    pub fn disable_entropy_source(&mut self) -> CaliptraResult<()> {
         if let Self::Internal(csrng) = self {
             csrng.disable_entropy_source()
+        } else {
+            Ok(())
         }
     }
 }

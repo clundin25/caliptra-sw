@@ -98,7 +98,8 @@ pub use caliptra_okref::okmutref;
 pub use caliptra_okref::okref;
 pub use cmac_kdf::cmac_kdf;
 pub use csrng::{
-    Csrng, HealthFailCounts as CsrngHealthFailCounts, Seed as CsrngSeed, MAX_SEED_WORDS,
+    Csrng, Disabled as EntropySrcDisabled, Enabled as EntropySrcEnabled, EntropySrc,
+    HealthFailCounts as CsrngHealthFailCounts, Seed as CsrngSeed, MAX_SEED_WORDS,
 };
 pub use data_vault::{ColdResetEntries, DataVault, WarmResetEntries};
 pub use dma::{

@@ -28,6 +28,7 @@ use caliptra_registers::csrng::CsrngReg;
 use caliptra_registers::entropy_src::{self, regs::AlertFailCountsReadVal, EntropySrcReg};
 use caliptra_registers::soc_ifc::{self, SocIfcReg};
 
+use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
 // https://opentitan.org/book/hw/ip/csrng/doc/theory_of_operation.html#command-description
@@ -45,10 +46,124 @@ struct CsrngEntropyConfiguration {
     entropy_cfg_extension: EntropyConfigurationExtension,
 }
 
+/// State marker: Entropy source is disabled.
+pub struct Disabled;
+
+/// State marker: Entropy source is enabled.
+pub struct Enabled;
+
+/// Driver for the `entropy_src` peripheral managed via type state.
+pub struct EntropySrc<State = Disabled> {
+    entropy_src: EntropySrcReg,
+    _state: PhantomData<State>,
+}
+
+impl EntropySrc<Disabled> {
+    pub fn new(entropy_src: EntropySrcReg) -> Self {
+        Self {
+            entropy_src,
+            _state: PhantomData,
+        }
+    }
+
+    /// Configures and enables the entropy source peripheral.
+    pub fn enable(
+        mut self,
+        soc_ifc: &SocIfcReg,
+        persistent_data: PersistentDataAccessor,
+    ) -> CaliptraResult<EntropySrc<Enabled>> {
+        let e = self.entropy_src.regs_mut();
+
+        let entropy_cfg = read_entropy_configuration(&soc_ifc.regs(), persistent_data);
+        set_health_check_thresholds(e, entropy_cfg.entropy_cfg.clone());
+
+        let rng_bit_enable = if entropy_cfg.entropy_cfg_extension.rng_bit_enable() {
+            MULTIBIT_TRUE
+        } else {
+            MULTIBIT_FALSE
+        };
+
+        e.conf().write(|w| {
+            w.fips_enable(MULTIBIT_TRUE)
+                .entropy_data_reg_enable(MULTIBIT_FALSE)
+                // THRESHOLD_SCOPE=FALSE so adaptive-proportion and Markov health
+                // tests score each of the 4 RNG bus lanes individually.
+                .threshold_scope(MULTIBIT_FALSE)
+                .rng_bit_enable(rng_bit_enable)
+                .rng_bit_sel(entropy_cfg.entropy_cfg_extension.rng_bit_sel())
+        });
+
+        if (soc_ifc.regs().ss_strap_generic().at(2).read()
+            >> SS_STRAP_GENERIC_2_ENTROPY_BYPASS_SHIFT)
+            & 1
+            == 1
+        {
+            e.entropy_control().modify(|w| w.es_type(MULTIBIT_TRUE));
+        }
+        e.module_enable().write(|w| w.module_enable(MULTIBIT_TRUE));
+        check_for_alert_state(self.entropy_src.regs())?;
+
+        if soc_ifc.regs().cptra_security_state().read().debug_locked() {
+            let e = self.entropy_src.regs_mut();
+            e.sw_regupd().modify(|w| w.sw_regupd(false));
+        }
+
+        Ok(EntropySrc {
+            entropy_src: self.entropy_src,
+            _state: PhantomData,
+        })
+    }
+}
+
+impl EntropySrc<Enabled> {
+    /// Disable entropy_src.
+    ///
+    /// # Invariant Safety
+    /// Must be called only after any in-flight Reseed has consumed its seed
+    /// from the esfinal FIFO; disabling mid-Reseed clears that FIFO and hangs
+    /// the CSRNG in `MainSmReseedPrep`. Pair with `wait_for_csrng_idle`.
+    pub fn disable(mut self, csrng: &Csrng) -> CaliptraResult<EntropySrc<Disabled>> {
+        csrng.wait_for_csrng_idle()?;
+
+        self.entropy_src
+            .regs_mut()
+            .module_enable()
+            .write(|w| w.module_enable(MULTIBIT_FALSE));
+
+        Ok(EntropySrc {
+            entropy_src: self.entropy_src,
+            _state: PhantomData,
+        })
+    }
+}
+
+impl<State> EntropySrc<State> {
+    /// Returns the number of failing health checks.
+    pub fn health_fail_counts(&self) -> HealthFailCounts {
+        let e = self.entropy_src.regs();
+
+        HealthFailCounts {
+            total: e.alert_summary_fail_counts().read().any_fail_count(),
+            specific: e.alert_fail_counts().read(),
+        }
+    }
+
+    /// Access the underlying register block.
+    pub fn regs(&self) -> entropy_src::RegisterBlock<caliptra_ureg::RealMmio> {
+        self.entropy_src.regs()
+    }
+}
+
+pub enum EntropySrcState {
+    Enabled(EntropySrc<Enabled>),
+    Disabled(EntropySrc<Disabled>),
+    None,
+}
+
 /// A unique handle to the underlying CSRNG peripheral.
 pub struct Csrng {
     csrng: CsrngReg,
-    entropy_src: EntropySrcReg,
+    entropy_src: EntropySrcState,
 }
 
 impl Csrng {
@@ -83,7 +198,13 @@ impl Csrng {
     /// The caller MUST ensure that the CSRNG peripheral is in a state where new
     /// entropy is accessible via the generate command.
     pub unsafe fn assume_initialized(csrng: CsrngReg, entropy_src: EntropySrcReg) -> Self {
-        Self { csrng, entropy_src }
+        Self {
+            csrng,
+            entropy_src: EntropySrcState::Enabled(EntropySrc {
+                entropy_src,
+                _state: PhantomData,
+            }),
+        }
     }
 
     /// Returns a handle to the CSRNG configured to use the provided [`Seed`].
@@ -102,59 +223,21 @@ impl Csrng {
         seed: Seed,
         persistent_data: PersistentDataAccessor,
     ) -> CaliptraResult<Self> {
-        let mut result = Self { csrng, entropy_src };
-        let e = result.entropy_src.regs_mut();
+        let es_disabled = EntropySrc::new(entropy_src);
+        let es_enabled = es_disabled.enable(soc_ifc, persistent_data)?;
+        let mut result = Self {
+            csrng,
+            entropy_src: EntropySrcState::Enabled(es_enabled),
+        };
 
-        // Configure and enable entropy_src if not already enabled.
-        // If already enabled, assume it was configured correctly by a previous call.
-        if e.module_enable().read().module_enable() == MULTIBIT_FALSE {
-            // Configure entropy_src
-            let entropy_cfg = read_entropy_configuration(&soc_ifc.regs(), persistent_data);
-            set_health_check_thresholds(e, entropy_cfg.entropy_cfg.clone());
-
-            let rng_bit_enable = if entropy_cfg.entropy_cfg_extension.rng_bit_enable() {
-                MULTIBIT_TRUE
-            } else {
-                MULTIBIT_FALSE
-            };
-
-            e.conf().write(|w| {
-                w.fips_enable(MULTIBIT_TRUE)
-                    .entropy_data_reg_enable(MULTIBIT_FALSE)
-                    // THRESHOLD_SCOPE=FALSE so adaptive-proportion and Markov health
-                    // tests score each of the 4 RNG bus lanes individually.
-                    .threshold_scope(MULTIBIT_FALSE)
-                    .rng_bit_enable(rng_bit_enable)
-                    .rng_bit_sel(entropy_cfg.entropy_cfg_extension.rng_bit_sel())
-            });
-
-            // We allow the SoC to set bypass mode so that entropy can be
-            // characterized directly, without passing through conditioning.
-            if (soc_ifc.regs().ss_strap_generic().at(2).read()
-                >> SS_STRAP_GENERIC_2_ENTROPY_BYPASS_SHIFT)
-                & 1
-                == 1
-            {
-                e.entropy_control().modify(|w| w.es_type(MULTIBIT_TRUE));
-            }
-            e.module_enable().write(|w| w.module_enable(MULTIBIT_TRUE));
-            check_for_alert_state(result.entropy_src.regs())?;
-
-            // Lock entropy_src configuration if not in debug mode.
-            // Per security model: ROM programs once, then locks permanently.
-            // - SW_REGUPD: When cleared, configuration registers become read-only
-            // In debug mode (debug_locked == false), leave unlocked for characterization.
-            // We leave the module enable able to be turned off for potential power savings in runtime.
-            if soc_ifc.regs().cptra_security_state().read().debug_locked() {
-                let e = result.entropy_src.regs_mut();
-                e.sw_regupd().modify(|w| w.sw_regupd(false));
-            }
-        }
         let c = result.csrng.regs_mut();
 
         if c.ctrl().read().enable() == MULTIBIT_FALSE {
-            c.ctrl()
-                .write(|w| w.enable(MULTIBIT_TRUE).sw_app_enable(MULTIBIT_TRUE).read_int_state(MULTIBIT_TRUE));
+            c.ctrl().write(|w| {
+                w.enable(MULTIBIT_TRUE)
+                    .sw_app_enable(MULTIBIT_TRUE)
+                    .read_int_state(MULTIBIT_TRUE)
+            });
         }
 
         send_command(&mut result.csrng, Command::Uninstantiate)?;
@@ -181,8 +264,6 @@ impl Csrng {
     /// }
     /// ```
     pub fn generate12(&mut self) -> CaliptraResult<[u32; 12]> {
-        self.manage_entropy_src_and_reseed()?;
-
         send_command(
             &mut self.csrng,
             Command::Generate {
@@ -218,54 +299,32 @@ impl Csrng {
         }
     }
 
-    /// Number of Generate calls before the reseed interval at which entropy_src
-    /// is pre-enabled, so it is ready by the time the reseed is needed.
-    /// Covers the ~2 ms entropy_src startup at typical generate cadence.
-    pub const ENTROPY_SRC_PRE_ENABLE_HEADROOM: u32 = 5;
-
     /// Disable entropy_src.
     ///
     /// Must be called only after any in-flight Reseed has consumed its seed
     /// from the esfinal FIFO; disabling mid-Reseed clears that FIFO and hangs
     /// the CSRNG in `MainSmReseedPrep`. Pair with `wait_for_csrng_idle`.
-    pub(crate) fn disable_entropy_source(&mut self) {
-        self.entropy_src
-            .regs_mut()
-            .module_enable()
-            .write(|w| w.module_enable(MULTIBIT_FALSE));
+    pub fn disable_entropy_source(&mut self) -> CaliptraResult<()> {
+        if let EntropySrcState::Enabled(es) =
+            core::mem::replace(&mut self.entropy_src, EntropySrcState::None)
+        {
+            let disabled = es.disable(self)?;
+            self.entropy_src = EntropySrcState::Disabled(disabled);
+        }
+        Ok(())
     }
 
-    pub(crate) fn enable_entropy_source(&mut self) {
-        self.entropy_src
-            .regs_mut()
-            .module_enable()
-            .write(|w| w.module_enable(MULTIBIT_TRUE));
-    }
-
-    /// Called before every Generate command. Keeps entropy_src disabled except
-    /// during a short window around each reseed:
-    ///
-    /// Phase 1 — pre-enable (`counter >= interval - HEADROOM`): enable
-    /// entropy_src in the background so its startup health checks overlap with
-    /// the next few Generates.
-    ///
-    /// Phase 2 — reseed (`counter >= interval`): reseed from entropy_src,
-    /// then disable it again. The Generate runs with entropy_src off.
-    fn manage_entropy_src_and_reseed(&mut self) -> CaliptraResult<()> {
-        let interval = self.csrng.regs().reseed_interval().read();
-        let counter = self.csrng.regs().reseed_counter_2().read();
-        if counter >= interval {
-            self.ensure_entropy_src_enabled(&Seed::EntropySrc)?;
-            self.reseed(Seed::EntropySrc)?;
-            self.disable_entropy_source();
-            return Ok(());
+    pub fn enable_entropy_source(
+        &mut self,
+        soc_ifc: &SocIfcReg,
+        persistent_data: PersistentDataAccessor,
+    ) -> CaliptraResult<()> {
+        if let EntropySrcState::Disabled(es) =
+            core::mem::replace(&mut self.entropy_src, EntropySrcState::None)
+        {
+            let enabled = es.enable(soc_ifc, persistent_data)?;
+            self.entropy_src = EntropySrcState::Enabled(enabled);
         }
-
-        let pre_enable_threshold = interval.saturating_sub(Self::ENTROPY_SRC_PRE_ENABLE_HEADROOM);
-        if counter >= pre_enable_threshold {
-            self.enable_entropy_source();
-        }
-
         Ok(())
     }
 
@@ -282,8 +341,6 @@ impl Csrng {
     ///
     /// Returns an error if the internal generate command fails.
     pub fn generate16(&mut self) -> CaliptraResult<[u32; 16]> {
-        self.manage_entropy_src_and_reseed()?;
-
         send_command(
             &mut self.csrng,
             Command::Generate {
@@ -314,7 +371,11 @@ impl Csrng {
     /// consumed. Callers that disable entropy_src after this call need that
     /// stronger guarantee.
     pub fn reseed(&mut self, seed: Seed) -> CaliptraResult<()> {
-        self.ensure_entropy_src_enabled(&seed)?;
+        if matches!(seed, Seed::EntropySrc) {
+            if let EntropySrcState::Enabled(ref es) = self.entropy_src {
+                check_for_alert_state(es.regs())?;
+            }
+        }
         // FIPS test hook: inject a reseed failure for testing on platforms
         // where the real TRNG cannot produce bad entropy (e.g. FPGA itrng).
         // No-op unless `fips-test-hooks` is enabled and the host arms
@@ -342,29 +403,13 @@ impl Csrng {
     /// Returns an error if either the internal `Uninstantiate` or
     /// `Instantiate` command fails.
     pub fn reinstantiate(&mut self, seed: Seed) -> CaliptraResult<()> {
-        self.ensure_entropy_src_enabled(&seed)?;
+        if matches!(seed, Seed::EntropySrc) {
+            if let EntropySrcState::Enabled(ref es) = self.entropy_src {
+                check_for_alert_state(es.regs())?;
+            }
+        }
         send_command(&mut self.csrng, Command::Uninstantiate)?;
         send_command(&mut self.csrng, Command::Instantiate(seed))
-    }
-
-    /// Enables entropy_src and waits for it to be ready if the seed source is
-    /// `EntropySrc` and the module is currently disabled. No-op for
-    /// `Seed::Constant` since entropy_src is not needed in that case.
-    fn ensure_entropy_src_enabled(&mut self, seed: &Seed) -> CaliptraResult<()> {
-        if matches!(seed, Seed::EntropySrc) {
-            if self
-                .entropy_src
-                .regs()
-                .module_enable()
-                .read()
-                .module_enable()
-                != MULTIBIT_TRUE
-            {
-                self.enable_entropy_source();
-            }
-            check_for_alert_state(self.entropy_src.regs())?;
-        }
-        Ok(())
     }
 
     pub fn update(&mut self, additional_data: &[u32]) -> CaliptraResult<()> {
@@ -377,11 +422,13 @@ impl Csrng {
 
     /// Returns the number of failing health checks.
     pub fn health_fail_counts(&self) -> HealthFailCounts {
-        let e = self.entropy_src.regs();
-
-        HealthFailCounts {
-            total: e.alert_summary_fail_counts().read().any_fail_count(),
-            specific: e.alert_fail_counts().read(),
+        match &self.entropy_src {
+            EntropySrcState::Enabled(es) => es.health_fail_counts(),
+            EntropySrcState::Disabled(es) => es.health_fail_counts(),
+            EntropySrcState::None => HealthFailCounts {
+                total: 0,
+                specific: 0u32.into(),
+            },
         }
     }
 
@@ -396,7 +443,7 @@ impl Csrng {
     /// Wait for the CSRNG main SM to return to Idle. `send_command` returns
     /// when the command is accepted into the staging FIFO, not when the CSRNG
     /// finishes executing it.
-    fn wait_for_csrng_idle(&self) -> CaliptraResult<()> {
+    pub fn wait_for_csrng_idle(&self) -> CaliptraResult<()> {
         const MAIN_SM_IDLE: u32 = 0x4e;
         loop {
             let state = self.csrng.regs().main_sm_state().read().main_sm_state();
