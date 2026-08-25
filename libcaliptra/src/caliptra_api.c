@@ -30,6 +30,8 @@ static uint8_t g_caliptra_fw_load_piecewise_in_progress CALIPTRA_API_GLOBAL_SECT
 // Shared rx buffer for commands that have no meaningful response beyond the standard header.
 // Safe to share because only one mailbox command can be in-flight at a time.
 static struct caliptra_resp_header g_resp_hdr CALIPTRA_API_GLOBAL_SECTION_ATTRIBUTE;
+static uint8_t g_sha_stream_buf[4] CALIPTRA_API_GLOBAL_SECTION_ATTRIBUTE;
+static uint32_t g_sha_stream_buf_len CALIPTRA_API_GLOBAL_SECTION_ATTRIBUTE;
 
 #define CREATE_PARCEL(name, op, req, resp) \
     struct parcel name = { \
@@ -1704,6 +1706,8 @@ int caliptra_start_sha_stream(int mode, uint8_t* in_data, uint32_t data_len) {
         return REG_ACCESS_ERROR;
     }
 
+    g_sha_stream_buf_len = 0;
+
     return caliptra_update_sha_stream(in_data, data_len);
 }
 
@@ -1735,36 +1739,49 @@ int caliptra_update_sha_stream(uint8_t* in_data, uint32_t data_len) {
         return REG_ACCESS_ERROR;
     }
 
-    // Write data to the SHA accelerator
-    uint32_t words = data_len / 4;
-    if (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__) {
-        // twizzle bytes on little-endian systems
-        for (uint32_t i = 0; i < words * 4; i+=4) {
-            uint32_t u32_data = in_data[i+3] | (in_data[i+2]<<8) | (in_data[i+1]<<16) | (in_data[i+0]<<24);
-            error = caliptra_write_u32(CALIPTRA_TOP_REG_SHA512_ACC_CSR_DATAIN, u32_data);
-            if (error) {
-                return REG_ACCESS_ERROR;
-            }
+    uint32_t offset = 0;
+
+    // If there are buffered bytes from a previous update, fill the buffer first
+    if (g_sha_stream_buf_len > 0) {
+        uint32_t needed = 4 - g_sha_stream_buf_len;
+        if (data_len < needed) {
+            memcpy(&g_sha_stream_buf[g_sha_stream_buf_len], in_data, data_len);
+            g_sha_stream_buf_len += data_len;
+            return NO_ERROR;
         }
-    } else {
-        for (uint32_t i = 0; i < words; i++) {
-            error = caliptra_write_u32(CALIPTRA_TOP_REG_SHA512_ACC_CSR_DATAIN, ((uint32_t*) in_data)[i]);
-            if (error) {
-                return REG_ACCESS_ERROR;
-            }
-        }
-    }
-    // Handle remaining bytes if any
-    uint32_t remaining_bytes = data_len%4;
-    if (remaining_bytes != 0) {
-        uint32_t partial_u32 = 0;
-        for (uint8_t i = 0; i < remaining_bytes; i++) {
-            partial_u32 |= in_data[(data_len-remaining_bytes)+i] << (24 - 8*i);
-        }
-        error = caliptra_write_u32(CALIPTRA_TOP_REG_SHA512_ACC_CSR_DATAIN, partial_u32);
+        memcpy(&g_sha_stream_buf[g_sha_stream_buf_len], in_data, needed);
+        uint32_t u32_data = ((uint32_t)g_sha_stream_buf[0] << 24) |
+                            ((uint32_t)g_sha_stream_buf[1] << 16) |
+                            ((uint32_t)g_sha_stream_buf[2] << 8) |
+                            (uint32_t)g_sha_stream_buf[3];
+        error = caliptra_write_u32(CALIPTRA_TOP_REG_SHA512_ACC_CSR_DATAIN, u32_data);
         if (error) {
             return REG_ACCESS_ERROR;
         }
+        g_sha_stream_buf_len = 0;
+        offset = needed;
+    }
+
+    // Write full 32-bit words to the SHA accelerator safely without unaligned access
+    uint32_t remaining = data_len - offset;
+    uint32_t words = remaining / 4;
+    for (uint32_t i = 0; i < words; i++) {
+        uint32_t idx = offset + i * 4;
+        uint32_t u32_data = ((uint32_t)in_data[idx] << 24) |
+                            ((uint32_t)in_data[idx + 1] << 16) |
+                            ((uint32_t)in_data[idx + 2] << 8) |
+                            (uint32_t)in_data[idx + 3];
+        error = caliptra_write_u32(CALIPTRA_TOP_REG_SHA512_ACC_CSR_DATAIN, u32_data);
+        if (error) {
+            return REG_ACCESS_ERROR;
+        }
+    }
+
+    // Buffer any remaining partial bytes for subsequent update or finish
+    uint32_t leftover = remaining % 4;
+    if (leftover != 0) {
+        memcpy(g_sha_stream_buf, &in_data[offset + words * 4], leftover);
+        g_sha_stream_buf_len = leftover;
     }
 
     return NO_ERROR;
@@ -1783,6 +1800,19 @@ int caliptra_finish_sha_stream(uint32_t* hash) {
     int error;
     if (!hash) {
         return INVALID_PARAMS;
+    }
+
+    // Flush any remaining buffered partial bytes with zero-padding
+    if (g_sha_stream_buf_len > 0) {
+        uint32_t partial_u32 = 0;
+        for (uint32_t i = 0; i < g_sha_stream_buf_len; i++) {
+            partial_u32 |= (uint32_t)g_sha_stream_buf[i] << (24 - 8 * i);
+        }
+        error = caliptra_write_u32(CALIPTRA_TOP_REG_SHA512_ACC_CSR_DATAIN, partial_u32);
+        if (error) {
+            return REG_ACCESS_ERROR;
+        }
+        g_sha_stream_buf_len = 0;
     }
 
     // Signal the SHA accelerator to finish the stream
