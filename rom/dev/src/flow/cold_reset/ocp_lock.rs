@@ -11,7 +11,7 @@ use caliptra_common::{
     crypto::Crypto,
     keyids::{
         ocp_lock::{KEY_ID_HEK, KEY_ID_MDK},
-        KEY_ID_HEK_SEED, KEY_ID_ROM_FMC_CDI, KEY_ID_TMP,
+        KEY_ID_HEK_SEED, KEY_ID_IDEVID_CDI, KEY_ID_TMP,
     },
 };
 use caliptra_drivers::{
@@ -49,7 +49,7 @@ fn derive_hek(env: &mut RomEnv) -> CaliptraResult<()> {
     // HKDF-Extract — HMAC(key=CDI, data=HEK_seed_in_KV)
     let result = (|| -> CaliptraResult<()> {
         env.hmac.hmac(
-            HmacKey::Key(KeyReadArgs::new(KEY_ID_ROM_FMC_CDI)),
+            HmacKey::Key(KeyReadArgs::new(KEY_ID_IDEVID_CDI)),
             HmacData::Key(KeyReadArgs::new(KEY_ID_HEK_SEED)),
             &mut env.trng,
             caliptra_drivers::HmacTag::Key(caliptra_drivers::KeyWriteArgs::new(
@@ -94,7 +94,7 @@ fn derive_mdk(env: &mut RomEnv) -> CaliptraResult<()> {
     Crypto::hmac_kdf(
         &mut env.hmac,
         &mut env.trng,
-        KEY_ID_ROM_FMC_CDI,
+        KEY_ID_IDEVID_CDI,
         b"ocp_lock_mdk",
         None,
         KEY_ID_MDK,
