@@ -1578,6 +1578,231 @@ int caliptra_reallocate_dpe_context_limits(struct caliptra_reallocate_dpe_contex
     return pack_and_execute_command(&p, async);
 }
 
+// OCP LOCK: Report HEK Metadata
+int caliptra_ocp_lock_report_hek_metadata(struct caliptra_ocp_lock_report_hek_metadata_req *req, struct caliptra_ocp_lock_report_hek_metadata_resp *resp, bool async)
+{
+    if (!req || !resp)
+    {
+        return INVALID_PARAMS;
+    }
+
+    CREATE_PARCEL(p, OP_OCP_LOCK_REPORT_HEK_METADATA, req, resp);
+
+    return pack_and_execute_command(&p, async);
+}
+
+// OCP LOCK: Get Algorithms
+int caliptra_ocp_lock_get_algorithms(struct caliptra_ocp_lock_get_algorithms_resp *resp, bool async)
+{
+    if (!resp)
+    {
+        return INVALID_PARAMS;
+    }
+
+    caliptra_checksum checksum = 0;
+
+    CREATE_PARCEL(p, OP_OCP_LOCK_GET_ALGORITHMS, &checksum, resp);
+
+    return pack_and_execute_command(&p, async);
+}
+
+// OCP LOCK: Initialize MEK Secret
+int caliptra_ocp_lock_initialize_mek_secret(struct caliptra_ocp_lock_initialize_mek_secret_req *req, struct caliptra_ocp_lock_initialize_mek_secret_resp *resp, bool async)
+{
+    if (!req || !resp)
+    {
+        return INVALID_PARAMS;
+    }
+
+    CREATE_PARCEL(p, OP_OCP_LOCK_INITIALIZE_MEK_SECRET, req, resp);
+
+    return pack_and_execute_command(&p, async);
+}
+
+// OCP LOCK: Mix MPK
+int caliptra_ocp_lock_mix_mpk(struct caliptra_ocp_lock_mix_mpk_req *req, struct caliptra_ocp_lock_mix_mpk_resp *resp, bool async)
+{
+    if (!req || !resp)
+    {
+        return INVALID_PARAMS;
+    }
+
+    CREATE_PARCEL(p, OP_OCP_LOCK_MIX_MPK, req, resp);
+
+    return pack_and_execute_command(&p, async);
+}
+
+// OCP LOCK: Derive MEK
+int caliptra_ocp_lock_derive_mek(struct caliptra_ocp_lock_derive_mek_req *req, struct caliptra_ocp_lock_derive_mek_resp *resp, bool async)
+{
+    if (!req || !resp)
+    {
+        return INVALID_PARAMS;
+    }
+
+    CREATE_PARCEL(p, OP_OCP_LOCK_DERIVE_MEK, req, resp);
+
+    return pack_and_execute_command(&p, async);
+}
+
+// OCP LOCK: Enumerate HPKE Handles
+int caliptra_ocp_lock_enumerate_hpke_handles(struct caliptra_ocp_lock_enumerate_hpke_handles_req *req, struct caliptra_ocp_lock_enumerate_hpke_handles_resp *resp, bool async)
+{
+    if (!req || !resp)
+    {
+        return INVALID_PARAMS;
+    }
+
+    CREATE_PARCEL(p, OP_OCP_LOCK_ENUMERATE_HPKE_HANDLES, req, resp);
+
+    return pack_and_execute_command(&p, async);
+}
+
+// OCP LOCK: Rotate HPKE Key
+int caliptra_ocp_lock_rotate_hpke_key(struct caliptra_ocp_lock_rotate_hpke_key_req *req, struct caliptra_ocp_lock_rotate_hpke_key_resp *resp, bool async)
+{
+    if (!req || !resp)
+    {
+        return INVALID_PARAMS;
+    }
+
+    CREATE_PARCEL(p, OP_OCP_LOCK_ROTATE_HPKE_KEY, req, resp);
+
+    return pack_and_execute_command(&p, async);
+}
+
+// OCP LOCK: Generate MEK
+int caliptra_ocp_lock_generate_mek(struct caliptra_ocp_lock_generate_mek_req *req, struct caliptra_ocp_lock_generate_mek_resp *resp, bool async)
+{
+    if (!req || !resp)
+    {
+        return INVALID_PARAMS;
+    }
+
+    CREATE_PARCEL(p, OP_OCP_LOCK_GENERATE_MEK, req, resp);
+
+    return pack_and_execute_command(&p, async);
+}
+
+// OCP LOCK: Get HPKE Public Key
+int caliptra_ocp_lock_get_hpke_pub_key(struct caliptra_ocp_lock_get_hpke_pub_key_req *req, struct caliptra_ocp_lock_get_hpke_pub_key_resp *resp, bool async)
+{
+    if (!req || !resp)
+    {
+        return INVALID_PARAMS;
+    }
+
+    CREATE_PARCEL(p, OP_OCP_LOCK_GET_HPKE_PUB_KEY, req, resp);
+
+    return pack_and_execute_command(&p, async);
+}
+
+// OCP LOCK: Generate MPK
+int caliptra_ocp_lock_generate_mpk(struct caliptra_ocp_lock_generate_mpk_req *req, struct caliptra_ocp_lock_generate_mpk_resp *resp, bool async)
+{
+    if (!req || !resp)
+    {
+        return INVALID_PARAMS;
+    }
+
+    CREATE_PARCEL(p, OP_OCP_LOCK_GENERATE_MPK, req, resp);
+
+    return pack_and_execute_command(&p, async);
+}
+
+// OCP LOCK: Rewrap MPK
+int caliptra_ocp_lock_rewrap_mpk(struct caliptra_ocp_lock_rewrap_mpk_req *req, struct caliptra_ocp_lock_rewrap_mpk_resp *resp, bool async)
+{
+    if (!req || !resp)
+    {
+        return INVALID_PARAMS;
+    }
+
+    CREATE_PARCEL(p, OP_OCP_LOCK_REWRAP_MPK, req, resp);
+
+    return pack_and_execute_command(&p, async);
+}
+
+// OCP LOCK: Enable MPK
+int caliptra_ocp_lock_enable_mpk(struct caliptra_ocp_lock_enable_mpk_req *req, struct caliptra_ocp_lock_enable_mpk_resp *resp, bool async)
+{
+    if (!req || !resp)
+    {
+        return INVALID_PARAMS;
+    }
+
+    CREATE_PARCEL(p, OP_OCP_LOCK_ENABLE_MPK, req, resp);
+
+    return pack_and_execute_command(&p, async);
+}
+
+// OCP LOCK: Test Access Key
+int caliptra_ocp_lock_test_access_key(struct caliptra_ocp_lock_test_access_key_req *req, struct caliptra_ocp_lock_test_access_key_resp *resp, bool async)
+{
+    if (!req || !resp)
+    {
+        return INVALID_PARAMS;
+    }
+
+    CREATE_PARCEL(p, OP_OCP_LOCK_TEST_ACCESS_KEY, req, resp);
+
+    return pack_and_execute_command(&p, async);
+}
+
+// OCP LOCK: Get Status
+int caliptra_ocp_lock_get_status(struct caliptra_ocp_lock_get_status_resp *resp, bool async)
+{
+    if (!resp)
+    {
+        return INVALID_PARAMS;
+    }
+
+    caliptra_checksum checksum = 0;
+
+    CREATE_PARCEL(p, OP_OCP_LOCK_GET_STATUS, &checksum, resp);
+
+    return pack_and_execute_command(&p, async);
+}
+
+// OCP LOCK: Clear Key Cache
+int caliptra_ocp_lock_clear_key_cache(struct caliptra_ocp_lock_clear_key_cache_req *req, struct caliptra_ocp_lock_clear_key_cache_resp *resp, bool async)
+{
+    if (!req || !resp)
+    {
+        return INVALID_PARAMS;
+    }
+
+    CREATE_PARCEL(p, OP_OCP_LOCK_CLEAR_KEY_CACHE, req, resp);
+
+    return pack_and_execute_command(&p, async);
+}
+
+// OCP LOCK: Unload MEK
+int caliptra_ocp_lock_unload_mek(struct caliptra_ocp_lock_unload_mek_req *req, struct caliptra_ocp_lock_unload_mek_resp *resp, bool async)
+{
+    if (!req || !resp)
+    {
+        return INVALID_PARAMS;
+    }
+
+    CREATE_PARCEL(p, OP_OCP_LOCK_UNLOAD_MEK, req, resp);
+
+    return pack_and_execute_command(&p, async);
+}
+
+// OCP LOCK: Load MEK
+int caliptra_ocp_lock_load_mek(struct caliptra_ocp_lock_load_mek_req *req, struct caliptra_ocp_lock_load_mek_resp *resp, bool async)
+{
+    if (!req || !resp)
+    {
+        return INVALID_PARAMS;
+    }
+
+    CREATE_PARCEL(p, OP_OCP_LOCK_LOAD_MEK, req, resp);
+
+    return pack_and_execute_command(&p, async);
+}
+
 int caliptra_retrieve_idevid_csr(struct caliptra_buffer* caliptra_idevid_csr)
 {
     if (!caliptra_idevid_csr) {
@@ -1624,3 +1849,40 @@ bool caliptra_is_idevid_csr_ready() {
 
     return false;
 }
+
+// OCP LOCK struct size validations
+_Static_assert(sizeof(struct caliptra_ocp_lock_hpke_handle) == 8, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_wrapped_key) == 148, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_sealed_access_key) == 1988, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_report_hek_metadata_req) == 16, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_report_hek_metadata_resp) == 24, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_get_algorithms_resp) == 32, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_initialize_mek_secret_req) == 72, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_initialize_mek_secret_resp) == 12, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_mix_mpk_req) == 156, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_mix_mpk_resp) == 12, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_derive_mek_req) == 80, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_derive_mek_resp) == 28, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_enumerate_hpke_handles_req) == 8, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_enumerate_hpke_handles_resp) == 40, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_rotate_hpke_key_req) == 12, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_rotate_hpke_key_resp) == 16, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_generate_mek_req) == 8, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_generate_mek_resp) == 160, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_get_hpke_pub_key_req) == 12, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_get_hpke_pub_key_resp) == 1684, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_generate_mpk_req) == 2064, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_generate_mpk_resp) == 160, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_rewrap_mpk_req) == 2224, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_rewrap_mpk_resp) == 160, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_enable_mpk_req) == 2176, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_enable_mpk_resp) == 160, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_test_access_key_req) == 2208, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_test_access_key_resp) == 60, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_get_status_resp) == 28, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_clear_key_cache_req) == 12, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_clear_key_cache_resp) == 12, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_unload_mek_req) == 32, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_unload_mek_resp) == 12, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_load_mek_req) == 212, "size mismatch");
+_Static_assert(sizeof(struct caliptra_ocp_lock_load_mek_resp) == 12, "size mismatch");
